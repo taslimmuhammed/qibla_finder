@@ -17,15 +17,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -64,6 +69,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var isLocationPermissionGranted by mutableStateOf(false)
     private var locationAccuracy by mutableFloatStateOf(0f)
     private var magneticDeclination by mutableFloatStateOf(0f)
+    private var compassAccuracy by mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
+    private var showCalibrationOverlay by mutableStateOf(false)
     
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -102,6 +109,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         qiblaDirection = qiblaDirection,
                         location = userLocation,
                         locationAccuracy = locationAccuracy,
+                        showCalibration = showCalibrationOverlay,
+                        onDismissCalibration = { showCalibrationOverlay = false },
                         onRequestLocation = { checkLocationPermission() }
                     )
                 }
@@ -263,7 +272,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
     
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Not needed for this implementation
+        sensor?.let {
+            when (it.type) {
+                Sensor.TYPE_MAGNETIC_FIELD -> {
+                    compassAccuracy = accuracy
+                    // Show calibration overlay if accuracy is low or unreliable
+                    showCalibrationOverlay = when (accuracy) {
+                        SensorManager.SENSOR_STATUS_UNRELIABLE,
+                        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> true
+                        else -> false
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -273,6 +294,8 @@ fun QiblaCompassScreen(
     qiblaDirection: Float,
     location: Location?,
     locationAccuracy: Float,
+    showCalibration: Boolean,
+    onDismissCalibration: () -> Unit,
     onRequestLocation: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -699,6 +722,11 @@ fun QiblaCompassScreen(
                 }
             }
         }
+        
+        // Calibration Overlay
+        if (showCalibration) {
+            CalibrationOverlay(onDismiss = onDismissCalibration)
+        }
     }
 }
 
@@ -713,4 +741,117 @@ fun QiblaFinderTheme(content: @Composable () -> Unit) {
         ),
         content = content
     )
+}
+
+// Calibration Overlay Composables
+@Composable
+fun CalibrationOverlay(onDismiss: () -> Unit) {
+    val alpha = remember { Animatable(0f) }
+    
+    LaunchedEffect(Unit) {
+        alpha.animateTo(targetValue = 1f, animationSpec = tween(300, easing = EaseOut))
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A1128).copy(alpha = alpha.value * 0.95f))
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val pulseScale = infiniteTransition.animateFloat(
+                initialValue = 1f, targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(animation = tween(800, easing = EaseInOut), repeatMode = RepeatMode.Reverse),
+                label = "pulse"
+            )
+            
+            Canvas(modifier = Modifier.size(80.dp)) {
+                drawCircle(brush = Brush.radialGradient(colors = listOf(Color(0xFFFFAA00).copy(alpha = 0.4f), Color.Transparent)), radius = size.minDimension / 2 * pulseScale.value)
+                val path = Path().apply { moveTo(size.width / 2, size.height * 0.2f); lineTo(size.width * 0.2f, size.height * 0.8f); lineTo(size.width * 0.8f, size.height * 0.8f); close() }
+                drawPath(path = path, color = Color(0xFFFFAA00), style = Stroke(width = 3.dp.toPx()))
+                drawLine(color = Color(0xFFFFAA00), start = Offset(size.width / 2, size.height * 0.4f), end = Offset(size.width / 2, size.height * 0.6f), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(color = Color(0xFFFFAA00), radius = 3.dp.toPx(), center = Offset(size.width / 2, size.height * 0.7f))
+            }
+            
+            Text(text = "COMPASS CALIBRATION NEEDED", fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = Color(0xFFFFAA00), textAlign = TextAlign.Center)
+            Text(text = "Low compass accuracy detected", fontSize = 14.sp, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+            
+            Figure8Animation()
+            
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2541).copy(alpha = 0.8f)), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(text = "How to Calibrate:", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD4AF37), letterSpacing = 1.sp)
+                    CalibrationStep("1", "Hold your device and move it away from your body")
+                    CalibrationStep("2", "Tilt and rotate the device in a figure-8 pattern")
+                    CalibrationStep("3", "Repeat the motion 3-4 times in different orientations")
+                    CalibrationStep("4", "Move away from metal objects and electronics")
+                }
+            }
+            
+            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD4AF37).copy(alpha = 0.3f)), modifier = Modifier.fillMaxWidth()) {
+                Text(text = "I'VE CALIBRATED", letterSpacing = 2.sp, fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp))
+            }
+            
+            Text(text = "Tap anywhere to dismiss", fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f), letterSpacing = 1.sp)
+        }
+    }
+}
+
+@Composable
+fun Figure8Animation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "figure8")
+    val progress = infiniteTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(3000, easing = LinearEasing), repeatMode = RepeatMode.Restart), label = "progress")
+    
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2541).copy(alpha = 0.6f)), modifier = Modifier.fillMaxWidth().height(200.dp)) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.fillMaxWidth(0.8f).height(150.dp)) {
+                val centerY = size.height / 2; val width = size.width; val lobeRadius = size.height / 3
+                val path = Path(); var firstPoint = true
+                for (t in 0..360 step 2) {
+                    val radians = Math.toRadians(t.toDouble()); val scale = 2.0 / (3.0 - cos(2 * radians))
+                    val x = (width / 2 + lobeRadius * scale * cos(radians)).toFloat()
+                    val y = (centerY + lobeRadius * scale * sin(radians) * cos(radians)).toFloat()
+                    if (firstPoint) { path.moveTo(x, y); firstPoint = false } else { path.lineTo(x, y) }
+                }
+                path.close()
+                drawPath(path = path, color = Color(0xFFD4AF37).copy(alpha = 0.3f), style = Stroke(width = 2.dp.toPx()))
+                
+                val t = progress.value * 360; val radians = Math.toRadians(t.toDouble()); val scale = 2.0 / (3.0 - cos(2 * radians))
+                val deviceX = (width / 2 + lobeRadius * scale * cos(radians)).toFloat()
+                val deviceY = (centerY + lobeRadius * scale * sin(radians) * cos(radians)).toFloat()
+                
+                for (i in 1..10) {
+                    val trailT = (progress.value - i * 0.02f) * 360; val trailRadians = Math.toRadians(trailT.toDouble()); val trailScale = 2.0 / (3.0 - cos(2 * trailRadians))
+                    val trailX = (width / 2 + lobeRadius * trailScale * cos(trailRadians)).toFloat()
+                    val trailY = (centerY + lobeRadius * trailScale * sin(trailRadians) * cos(trailRadians)).toFloat()
+                    drawCircle(color = Color(0xFF00D9FF).copy(alpha = 0.1f * (11 - i) / 10), radius = 4.dp.toPx() * (11 - i) / 10, center = Offset(trailX, trailY))
+                }
+                
+                val devicePath = Path().apply {
+                    val phoneWidth = 20.dp.toPx(); val phoneHeight = 30.dp.toPx()
+                    addRoundRect(RoundRect(rect = Rect(left = deviceX - phoneWidth / 2, top = deviceY - phoneHeight / 2, right = deviceX + phoneWidth / 2, bottom = deviceY + phoneHeight / 2), cornerRadius = CornerRadius(4.dp.toPx())))
+                }
+                drawCircle(brush = Brush.radialGradient(colors = listOf(Color(0xFF00D9FF).copy(alpha = 0.6f), Color.Transparent), center = Offset(deviceX, deviceY), radius = 20.dp.toPx()), radius = 20.dp.toPx(), center = Offset(deviceX, deviceY))
+                drawPath(path = devicePath, brush = Brush.linearGradient(colors = listOf(Color(0xFF00D9FF), Color(0xFF00A8CC))))
+                drawLine(color = Color.White, start = Offset(deviceX - 6.dp.toPx(), deviceY + 10.dp.toPx()), end = Offset(deviceX + 6.dp.toPx(), deviceY + 10.dp.toPx()), strokeWidth = 1.dp.toPx(), cap = StrokeCap.Round)
+            }
+            Text(text = "↻", fontSize = 40.sp, color = Color(0xFFD4AF37).copy(alpha = 0.5f), modifier = Modifier.align(Alignment.TopCenter))
+        }
+    }
+}
+
+@Composable
+fun CalibrationStep(number: String, text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        Box(modifier = Modifier.size(28.dp).background(color = Color(0xFFD4AF37).copy(alpha = 0.3f), shape = MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
+            Text(text = number, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD4AF37))
+        }
+        Text(text = text, fontSize = 14.sp, color = Color.White.copy(alpha = 0.9f), lineHeight = 20.sp, modifier = Modifier.weight(1f))
+    }
 }
