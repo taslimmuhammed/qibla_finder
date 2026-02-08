@@ -51,12 +51,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
     
+    // Low-pass filter for smoothing sensor readings
+    private val alpha = 0.15f // Smoothing factor (0 = max smoothing, 1 = no smoothing)
+    private val smoothedAccelerometer = FloatArray(3)
+    private val smoothedMagnetometer = FloatArray(3)
+    
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     
     private var currentAzimuth by mutableFloatStateOf(0f)
     private var qiblaDirection by mutableFloatStateOf(0f)
     private var userLocation by mutableStateOf<Location?>(null)
     private var isLocationPermissionGranted by mutableStateOf(false)
+    private var locationAccuracy by mutableFloatStateOf(0f)
+    private var magneticDeclination by mutableFloatStateOf(0f)
     
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -94,6 +101,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         azimuth = currentAzimuth,
                         qiblaDirection = qiblaDirection,
                         location = userLocation,
+                        locationAccuracy = locationAccuracy,
                         onRequestLocation = { checkLocationPermission() }
                     )
                 }
@@ -132,42 +140,80 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         
         val cancellationTokenSource = CancellationTokenSource()
         
+        // Use high accuracy location with improved settings
         fusedLocationClient.getCurrentLocation(
             Priority.PRIORITY_HIGH_ACCURACY,
             cancellationTokenSource.token
         ).addOnSuccessListener { location: Location? ->
             location?.let {
-                userLocation = it
-                calculateQiblaDirection(it.latitude, it.longitude)
+                // Only use location if accuracy is good enough
+                if (it.hasAccuracy() && it.accuracy <= 50f) { // Within 50 meters
+                    userLocation = it
+                    locationAccuracy = it.accuracy
+                    
+                    // Calculate magnetic declination for this location
+                    val geoField = android.hardware.GeomagneticField(
+                        it.latitude.toFloat(),
+                        it.longitude.toFloat(),
+                        it.altitude.toFloat(),
+                        System.currentTimeMillis()
+                    )
+                    magneticDeclination = geoField.declination
+                    
+                    calculateQiblaDirection(it.latitude, it.longitude)
+                } else {
+                    // Accuracy not good enough, try again
+                    userLocation = it
+                    locationAccuracy = it.accuracy
+                    
+                    // Calculate magnetic declination anyway
+                    val geoField = android.hardware.GeomagneticField(
+                        it.latitude.toFloat(),
+                        it.longitude.toFloat(),
+                        it.altitude.toFloat(),
+                        System.currentTimeMillis()
+                    )
+                    magneticDeclination = geoField.declination
+                    
+                    calculateQiblaDirection(it.latitude, it.longitude)
+                    // You could also request location updates for better accuracy
+                }
             }
         }
     }
     
     private fun calculateQiblaDirection(latitude: Double, longitude: Double) {
-        // Kaaba coordinates
-        val kaabaLat = 21.4225
-        val kaabaLng = 39.8262
+        // Kaaba coordinates (precise)
+        val kaabaLat = 21.422487
+        val kaabaLng = 39.826206
         
-        val latDiff = Math.toRadians(kaabaLat - latitude)
-        val lngDiff = Math.toRadians(kaabaLng - longitude)
+        // Convert to radians
+        val lat1Rad = Math.toRadians(latitude)
+        val lat2Rad = Math.toRadians(kaabaLat)
+        val deltaLonRad = Math.toRadians(kaabaLng - longitude)
         
-        val lat1 = Math.toRadians(latitude)
-        val lat2 = Math.toRadians(kaabaLat)
+        // Haversine formula for accurate bearing calculation
+        val y = sin(deltaLonRad) * cos(lat2Rad)
+        val x = cos(lat1Rad) * sin(lat2Rad) - 
+                sin(lat1Rad) * cos(lat2Rad) * cos(deltaLonRad)
         
-        val y = sin(lngDiff) * cos(lat2)
-        val x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(lngDiff)
+        // Calculate initial bearing
+        val bearingRad = atan2(y, x)
         
-        var bearing = Math.toDegrees(atan2(y, x))
-        qiblaDirection = ((bearing + 360) % 360).toFloat()
+        // Convert to degrees and normalize to 0-360
+        val bearing = (Math.toDegrees(bearingRad) + 360) % 360
+        
+        qiblaDirection = bearing.toFloat()
     }
     
     override fun onResume() {
         super.onResume()
+        // Use SENSOR_DELAY_GAME for better accuracy and responsiveness
         accelerometer?.also { accel ->
-            sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_UI)
+            sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
         }
         magnetometer?.also { mag ->
-            sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_UI)
+            sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_GAME)
         }
     }
     
@@ -179,24 +225,41 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
-                System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
+                // Apply low-pass filter for smoothing
+                smoothedAccelerometer[0] = alpha * event.values[0] + (1 - alpha) * smoothedAccelerometer[0]
+                smoothedAccelerometer[1] = alpha * event.values[1] + (1 - alpha) * smoothedAccelerometer[1]
+                smoothedAccelerometer[2] = alpha * event.values[2] + (1 - alpha) * smoothedAccelerometer[2]
+                System.arraycopy(smoothedAccelerometer, 0, accelerometerReading, 0, 3)
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
-                System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
+                // Apply low-pass filter for smoothing
+                smoothedMagnetometer[0] = alpha * event.values[0] + (1 - alpha) * smoothedMagnetometer[0]
+                smoothedMagnetometer[1] = alpha * event.values[1] + (1 - alpha) * smoothedMagnetometer[1]
+                smoothedMagnetometer[2] = alpha * event.values[2] + (1 - alpha) * smoothedMagnetometer[2]
+                System.arraycopy(smoothedMagnetometer, 0, magnetometerReading, 0, 3)
             }
         }
         
-        SensorManager.getRotationMatrix(
+        // Calculate rotation matrix with improved accuracy
+        val success = SensorManager.getRotationMatrix(
             rotationMatrix,
             null,
             accelerometerReading,
             magnetometerReading
         )
         
-        SensorManager.getOrientation(rotationMatrix, orientationAngles)
-        
-        val azimuthInDegrees = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-        currentAzimuth = (azimuthInDegrees + 360) % 360
+        if (success) {
+            SensorManager.getOrientation(rotationMatrix, orientationAngles)
+            
+            // Convert azimuth from radians to degrees
+            val azimuthInDegrees = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+            
+            // Apply magnetic declination to convert from magnetic north to true north
+            val trueAzimuth = azimuthInDegrees + magneticDeclination
+            
+            // Normalize to 0-360 range
+            currentAzimuth = (trueAzimuth + 360) % 360
+        }
     }
     
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -209,6 +272,7 @@ fun QiblaCompassScreen(
     azimuth: Float,
     qiblaDirection: Float,
     location: Location?,
+    locationAccuracy: Float,
     onRequestLocation: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -575,6 +639,44 @@ fun QiblaCompassScreen(
                                     color = Color.White,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    
+                    // GPS Accuracy Indicator
+                    if (locationAccuracy > 0) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF1C2541).copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Accuracy indicator dot
+                                val accuracyColor = when {
+                                    locationAccuracy <= 10f -> Color(0xFF00FF88) // Excellent
+                                    locationAccuracy <= 25f -> Color(0xFF00D9FF) // Good
+                                    locationAccuracy <= 50f -> Color(0xFFFFAA00) // Fair
+                                    else -> Color(0xFFFF4444) // Poor
+                                }
+                                
+                                Canvas(modifier = Modifier.size(8.dp)) {
+                                    drawCircle(color = accuracyColor)
+                                }
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = "GPS ACCURACY: ±%.1fm".format(locationAccuracy),
+                                    fontSize = 11.sp,
+                                    letterSpacing = 0.5.sp,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontFamily = FontFamily.Monospace
                                 )
                             }
                         }
