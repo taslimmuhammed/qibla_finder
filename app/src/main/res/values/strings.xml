@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Qibla Finder</string>
+    <string name="location_permission_required">Location permission is required to find Qibla direction</string>
+    <string name="enable_location">Enable Location</string>
+    <string name="qibla_direction">Qibla Direction</string>
+    <string name="latitude">Latitude</string>
+    <string name="longitude">Longitude</string>
+    <string name="calibrate_compass">Move your device in a figure-8 pattern to calibrate the compass</string>
+</resources>
