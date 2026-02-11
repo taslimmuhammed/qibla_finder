@@ -19,6 +19,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +41,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -100,19 +106,36 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         
         setContent {
             QiblaFinderTheme {
+                val navController = rememberNavController()
+                
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    QiblaCompassScreen(
-                        azimuth = currentAzimuth,
-                        qiblaDirection = qiblaDirection,
-                        location = userLocation,
-                        locationAccuracy = locationAccuracy,
-                        showCalibration = showCalibrationOverlay,
-                        onDismissCalibration = { showCalibrationOverlay = false },
-                        onRequestLocation = { checkLocationPermission() }
-                    )
+                    NavHost(
+                        navController = navController,
+                        startDestination = "compass"
+                    ) {
+                        composable("compass") {
+                            QiblaCompassScreen(
+                                azimuth = currentAzimuth,
+                                qiblaDirection = qiblaDirection,
+                                location = userLocation,
+                                locationAccuracy = locationAccuracy,
+                                showCalibration = showCalibrationOverlay,
+                                onDismissCalibration = { showCalibrationOverlay = false },
+                                onRequestLocation = { checkLocationPermission() },
+                                onNavigateToPrayerTimes = { navController.navigate("prayerTimes") }
+                            )
+                        }
+                        
+                        composable("prayerTimes") {
+                            PrayerTimesScreen(
+                                location = userLocation,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -296,7 +319,8 @@ fun QiblaCompassScreen(
     locationAccuracy: Float,
     showCalibration: Boolean,
     onDismissCalibration: () -> Unit,
-    onRequestLocation: () -> Unit
+    onRequestLocation: () -> Unit,
+    onNavigateToPrayerTimes: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -366,22 +390,48 @@ fun QiblaCompassScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "QIBLA FINDER",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = 6.sp,
-                    color = Color(0xFFD4AF37),
-                    fontFamily = FontFamily.Serif
-                )
-                
-                Text(
-                    text = "قِبْلَة",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFFD4AF37).copy(alpha = 0.9f),
-                    fontFamily = FontFamily.Serif
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(modifier = Modifier.width(48.dp))
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "QIBLA FINDER",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Light,
+                            letterSpacing = 6.sp,
+                            color = Color(0xFFD4AF37),
+                            fontFamily = FontFamily.Serif
+                        )
+                        
+                        Text(
+                            text = "قِبْلَة",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFFD4AF37).copy(alpha = 0.9f),
+                            fontFamily = FontFamily.Serif
+                        )
+                    }
+                    
+                    // Prayer Times Button
+                    IconButton(
+                        onClick = onNavigateToPrayerTimes,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = "Prayer Times",
+                            tint = Color(0xFFD4AF37),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
             }
             
             // Compass

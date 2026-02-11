@@ -64,9 +64,16 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.runtime:runtime-livedata")
+    implementation("androidx.compose.material:material-icons-extended")
     
     // Google Play Services - Location
     implementation("com.google.android.gms:play-services-location:21.1.0")
+    
+    // Prayer Times Library (Adhan)
+    implementation("com.batoulapps.adhan:adhan:1.2.0")
+    
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.7.6")
     
     // Testing
     testImplementation("junit:junit:4.13.2")
