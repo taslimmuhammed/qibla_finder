@@ -21,9 +21,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,23 +119,47 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             QiblaFinderTheme {
                 val navController = rememberNavController()
 
+                // Check if location services are enabled
+                val locationManager = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+                val isLocationEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                        locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    QiblaFinderApp(
-                        navController = navController,
-                        azimuth = currentAzimuth,
-                        qiblaDirection = qiblaDirection,
-                        location = userLocation,
-                        locationAccuracy = locationAccuracy,
-                        showCalibration = showCalibrationOverlay,
-                        onDismissCalibration = { showCalibrationOverlay = false },
-                        onRequestLocation = { checkLocationPermission() }
-                    )
+                    // Show location requirement screen if no location
+                    if (!isLocationPermissionGranted) {
+                        LocationPermissionScreen(
+                            onRequestPermission = { checkLocationPermission() }
+                        )
+                    } else if (!isLocationEnabled) {
+                        LocationRequiredScreen(
+                            onOpenSettings = { openLocationSettings() }
+                        )
+                    } else if (userLocation == null) {
+                        // Permission granted and GPS on, but waiting for location fix
+                        LocationLoadingScreen()
+                    } else {
+                        QiblaFinderApp(
+                            navController = navController,
+                            azimuth = currentAzimuth,
+                            qiblaDirection = qiblaDirection,
+                            location = userLocation,
+                            locationAccuracy = locationAccuracy,
+                            showCalibration = showCalibrationOverlay,
+                            onDismissCalibration = { showCalibrationOverlay = false },
+                            onRequestLocation = { checkLocationPermission() }
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private fun openLocationSettings() {
+        val intent = android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        startActivity(intent)
     }
 
     private fun checkLocationPermission() {
@@ -236,6 +267,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
         magnetometer?.also { mag ->
             sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_GAME)
+        }
+
+        // Re-check location when app resumes (user might have enabled it in settings)
+        if (isLocationPermissionGranted) {
+            // Check if location services are enabled
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+            val isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+            val isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+
+            if ((isGpsEnabled || isNetworkEnabled) && userLocation == null) {
+                // Location is enabled but we don't have a fix yet - try to get it
+                getUserLocation()
+            }
         }
     }
 
@@ -718,21 +762,6 @@ fun QiblaCompassScreen(
                             }
                         }
                     }
-                } ?: run {
-                    Button(
-                        onClick = onRequestLocation,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFD4AF37).copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "ENABLE LOCATION",
-                            letterSpacing = 2.sp,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
                 }
             }
         }
@@ -1072,5 +1101,617 @@ fun NavigationItem(
             color = labelColor,
             letterSpacing = 0.5.sp
         )
+    }
+}
+
+// Location Permission Screen
+@Composable
+fun LocationPermissionScreen(
+    onRequestPermission: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0A1128),
+                        Color(0xFF1C2541),
+                        Color(0xFF2E3D5C)
+                    )
+                )
+            )
+    ) {
+        // Stars background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val random = java.util.Random(42)
+            repeat(80) {
+                val x = random.nextFloat() * size.width
+                val y = random.nextFloat() * size.height
+                val alpha = random.nextFloat() * 0.5f + 0.3f
+                drawCircle(
+                    color = Color.White.copy(alpha = alpha),
+                    radius = random.nextFloat() * 1.5f + 0.5f,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp)
+        ) {
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // App icon/logo area
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(
+                        color = Color(0xFFD4AF37).copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.large
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Explore,
+                    contentDescription = "Qibla Finder",
+                    tint = Color(0xFFD4AF37),
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // App title
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "QIBLA FINDER",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = 6.sp,
+                    color = Color(0xFFD4AF37),
+                    fontFamily = FontFamily.Serif
+                )
+
+                Text(
+                    text = "قِبْلَة",
+                    fontSize = 24.sp,
+                    color = Color(0xFFD4AF37).copy(alpha = 0.9f),
+                    fontFamily = FontFamily.Serif
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Permission explanation
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1C2541).copy(alpha = 0.8f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = Color(0xFF00D9FF),
+                        modifier = Modifier.size(40.dp)
+                    )
+
+                    Text(
+                        text = "Location Permission Required",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "This app requires your location to:",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        PermissionReason(
+                            icon = Icons.Default.Explore,
+                            text = "Calculate accurate Qibla direction"
+                        )
+
+                        PermissionReason(
+                            icon = Icons.Default.Schedule,
+                            text = "Determine precise prayer times"
+                        )
+
+                        PermissionReason(
+                            icon = Icons.Default.MyLocation,
+                            text = "Provide location-specific guidance"
+                        )
+                    }
+
+                    Text(
+                        text = "Without location, the app cannot function correctly and may provide incorrect directions.",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFFAA00).copy(alpha = 0.9f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Grant permission button
+            Button(
+                onClick = onRequestPermission,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00D9FF)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "GRANT LOCATION PERMISSION",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+        }
+    }
+}
+
+// Location Required Screen (Permission granted but GPS off)
+@Composable
+fun LocationRequiredScreen(
+    onOpenSettings: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale = infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0A1128),
+                        Color(0xFF1C2541),
+                        Color(0xFF2E3D5C)
+                    )
+                )
+            )
+    ) {
+        // Stars background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val random = java.util.Random(42)
+            repeat(80) {
+                val x = random.nextFloat() * size.width
+                val y = random.nextFloat() * size.height
+                val alpha = random.nextFloat() * 0.5f + 0.3f
+                drawCircle(
+                    color = Color.White.copy(alpha = alpha),
+                    radius = random.nextFloat() * 1.5f + 0.5f,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp)
+        ) {
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Pulsing location icon
+            Box(
+                modifier = Modifier.size(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFFAA00).copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        ),
+                        radius = size.minDimension / 2 * pulseScale.value
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.LocationOff,
+                    contentDescription = "Location Disabled",
+                    tint = Color(0xFFFFAA00),
+                    modifier = Modifier.size(60.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Title
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "LOCATION SERVICES DISABLED",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    color = Color(0xFFFFAA00),
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "تم تعطيل خدمات الموقع",
+                    fontSize = 16.sp,
+                    color = Color(0xFFFFAA00).copy(alpha = 0.8f),
+                    fontFamily = FontFamily.Serif,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Explanation card
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1C2541).copy(alpha = 0.8f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Why Location is Essential",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD4AF37),
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "This app requires GPS to calculate accurate Islamic prayer information:",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.9f),
+                        lineHeight = 18.sp
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LocationBenefit(
+                            icon = Icons.Default.MyLocation,
+                            title = "Precise Qibla Direction",
+                            description = "Without your location, we cannot determine which direction to face for prayer."
+                        )
+
+                        LocationBenefit(
+                            icon = Icons.Default.Schedule,
+                            title = "Accurate Prayer Times",
+                            description = "Prayer times vary by location. GPS ensures times are correct for your area."
+                        )
+
+                        LocationBenefit(
+                            icon = Icons.Default.Warning,
+                            title = "Avoid Misguidance",
+                            description = "Using the app without location may provide incorrect directions and times."
+                        )
+                    }
+
+                    Divider(
+                        color = Color(0xFFD4AF37).copy(alpha = 0.3f),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+
+                    Text(
+                        text = "How to Enable Location:",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF00D9FF)
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LocationStep(number = "1", text = "Tap the button below to open Settings")
+                        LocationStep(number = "2", text = "Turn ON Location Services")
+                        LocationStep(number = "3", text = "Return to this app")
+                        LocationStep(number = "4", text = "App will automatically detect location")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Open settings button
+            Button(
+                onClick = onOpenSettings,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00D9FF)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "OPEN LOCATION SETTINGS",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Help text
+            Text(
+                text = "The app will work automatically once location is enabled",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                letterSpacing = 0.5.sp
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun PermissionReason(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color(0xFF00D9FF),
+            modifier = Modifier.size(24.dp)
+        )
+
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.9f),
+            lineHeight = 20.sp
+        )
+    }
+}
+
+@Composable
+fun LocationBenefit(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    color = Color(0xFF00D9FF).copy(alpha = 0.2f),
+                    shape = MaterialTheme.shapes.small
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color(0xFF00D9FF),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                letterSpacing = 0.5.sp
+            )
+
+            Text(
+                text = description,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun LocationStep(number: String, text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .background(
+                    color = Color(0xFFD4AF37).copy(alpha = 0.3f),
+                    shape = MaterialTheme.shapes.small
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = number,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFD4AF37)
+            )
+        }
+
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.9f),
+            lineHeight = 18.sp,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// Location Loading Screen (GPS acquiring signal)
+@Composable
+fun LocationLoadingScreen() {
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
+    val rotation = infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0A1128),
+                        Color(0xFF1C2541),
+                        Color(0xFF2E3D5C)
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        // Stars background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val random = java.util.Random(42)
+            repeat(80) {
+                val x = random.nextFloat() * size.width
+                val y = random.nextFloat() * size.height
+                val alpha = random.nextFloat() * 0.5f + 0.3f
+                drawCircle(
+                    color = Color.White.copy(alpha = alpha),
+                    radius = random.nextFloat() * 1.5f + 0.5f,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Rotating compass icon
+            Box(
+                modifier = Modifier.size(80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF00D9FF).copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                }
+
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Finding Location",
+                    tint = Color(0xFF00D9FF),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .graphicsLayer(rotationZ = rotation.value)
+                )
+            }
+
+            Text(
+                text = "Acquiring GPS Signal...",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF00D9FF),
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = "جارٍ الحصول على الموقع",
+                fontSize = 16.sp,
+                color = Color(0xFF00D9FF).copy(alpha = 0.8f),
+                fontFamily = FontFamily.Serif
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1C2541).copy(alpha = 0.6f)
+                ),
+                modifier = Modifier.padding(horizontal = 48.dp)
+            ) {
+                Text(
+                    text = "Please wait while we determine your precise location...",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
     }
 }

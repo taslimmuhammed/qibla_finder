@@ -250,107 +250,124 @@ fun CurrentPrayerCard(
         label = "glow"
     )
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1C2541).copy(alpha = 0.9f)
-        ),
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box {
-            // Glow effect
-            Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFF00D9FF).copy(alpha = glowAlpha.value * 0.3f),
-                            Color.Transparent
-                        ),
-                        center = Offset(size.width / 2, size.height / 2),
-                        radius = size.width / 2
-                    )
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
+        // Current Prayer Card
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF1C2541).copy(alpha = 0.9f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "CURRENT PRAYER",
-                    fontSize = 12.sp,
-                    letterSpacing = 3.sp,
-                    color = Color(0xFFD4AF37).copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Light
-                )
+                // Glow effect
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                ) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF00D9FF).copy(alpha = glowAlpha.value * 0.3f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width / 2, size.height / 2),
+                            radius = size.width / 2
+                        )
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = currentPrayer?.name ?: "Unknown",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00D9FF),
-                    letterSpacing = 2.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = getPrayerArabicName(currentPrayer),
-                    fontSize = 24.sp,
-                    color = Color(0xFF00D9FF).copy(alpha = 0.8f),
-                    fontFamily = FontFamily.Serif
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                if (nextPrayer != null) {
-                    val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
-                    val timeUntil = calculateTimeUntil(nextPrayerTime)
-
-                    Divider(
-                        color = Color(0xFFD4AF37).copy(alpha = 0.3f),
-                        modifier = Modifier.padding(vertical = 12.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 28.dp, horizontal = 24.dp)
+                ) {
+                    Text(
+                        text = "CURRENT PRAYER",
+                        fontSize = 11.sp,
+                        letterSpacing = 3.sp,
+                        color = Color(0xFFD4AF37).copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Light
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "NEXT PRAYER",
-                                fontSize = 10.sp,
-                                letterSpacing = 2.sp,
-                                color = Color(0xFFD4AF37).copy(alpha = 0.6f)
-                            )
-                            Text(
-                                text = nextPrayer.name,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                        }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "IN",
-                                fontSize = 10.sp,
-                                letterSpacing = 2.sp,
-                                color = Color(0xFFD4AF37).copy(alpha = 0.6f)
-                            )
-                            Text(
-                                text = timeUntil,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFD4AF37),
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
+                    Text(
+                        text = currentPrayer?.name ?: "Unknown",
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00D9FF),
+                        letterSpacing = 2.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = getPrayerArabicName(currentPrayer),
+                        fontSize = 24.sp,
+                        color = Color(0xFF00D9FF).copy(alpha = 0.8f),
+                        fontFamily = FontFamily.Serif
+                    )
+                }
+            }
+        }
+
+        // Next Prayer Card (separate)
+        if (nextPrayer != null) {
+            val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
+            val timeUntil = calculateTimeUntil(nextPrayerTime)
+
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF1C2541).copy(alpha = 0.7f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "NEXT PRAYER",
+                            fontSize = 10.sp,
+                            letterSpacing = 2.sp,
+                            color = Color(0xFFD4AF37).copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = nextPrayer.name,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "IN",
+                            fontSize = 10.sp,
+                            letterSpacing = 2.sp,
+                            color = Color(0xFFD4AF37).copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = timeUntil,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFD4AF37),
+                            fontFamily = FontFamily.Monospace
+                        )
                     }
                 }
             }
