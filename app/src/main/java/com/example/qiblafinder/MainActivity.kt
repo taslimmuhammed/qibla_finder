@@ -9,6 +9,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.animation.Animation
 import android.view.animation.RotateAnimation
 import androidx.activity.ComponentActivity
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +91,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var magneticDeclination by mutableFloatStateOf(0f)
     private var compassAccuracy by mutableIntStateOf(SensorManager.SENSOR_STATUS_ACCURACY_HIGH)
     private var showCalibrationOverlay by mutableStateOf(false)
+    private var isAligned by mutableStateOf(false)
+    private var lastAlignmentState by mutableStateOf(false)
+
+    private lateinit var vibrator: Vibrator
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -112,6 +119,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         checkLocationPermission()
 
@@ -148,6 +156,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             location = userLocation,
                             locationAccuracy = locationAccuracy,
                             showCalibration = showCalibrationOverlay,
+                            isAligned = isAligned,
                             onDismissCalibration = { showCalibrationOverlay = false },
                             onRequestLocation = { checkLocationPermission() }
                         )
@@ -325,6 +334,32 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
             // Normalize to 0-360 range
             currentAzimuth = (trueAzimuth + 360) % 360
+
+            // Check if compass is aligned with Qibla (within ±5 degrees)
+            val difference = abs(currentAzimuth - qiblaDirection)
+            val normalizedDifference = if (difference > 180) 360 - difference else difference
+            val newAlignmentState = normalizedDifference <= 5f
+
+            // Trigger haptic feedback when alignment state changes to true
+            if (newAlignmentState && !lastAlignmentState && userLocation != null) {
+                triggerAlignmentHaptic()
+            }
+
+            isAligned = newAlignmentState
+            lastAlignmentState = newAlignmentState
+        }
+    }
+
+    private fun triggerAlignmentHaptic() {
+        if (vibrator.hasVibrator()) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vibrator.vibrate(
+                    VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(100)
+            }
         }
     }
 
@@ -352,6 +387,7 @@ fun QiblaCompassScreen(
     location: Location?,
     locationAccuracy: Float,
     showCalibration: Boolean,
+    isAligned: Boolean,
     onDismissCalibration: () -> Unit,
     onRequestLocation: () -> Unit
 ) {
@@ -548,6 +584,21 @@ fun QiblaCompassScreen(
                         val qiblaX = center.x + (radius - 60.dp.toPx()) * sin(qiblaRad).toFloat()
                         val qiblaY = center.y - (radius - 60.dp.toPx()) * cos(qiblaRad).toFloat()
 
+                        // Alignment glow (green circle when aligned)
+                        if (isAligned) {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFF00FF88).copy(alpha = 0.4f),
+                                        Color(0xFF00FF88).copy(alpha = 0.2f),
+                                        Color.Transparent
+                                    ),
+                                    center = center,
+                                    radius = radius * 1.1f
+                                )
+                            )
+                        }
+
                         // Qibla arrow with glow
                         val path = Path().apply {
                             moveTo(center.x, center.y - 15.dp.toPx())
@@ -557,25 +608,27 @@ fun QiblaCompassScreen(
                             close()
                         }
 
-                        // Glow effect
+                        // Glow effect - changes color when aligned
+                        val glowColor = if (isAligned) Color(0xFF00FF88) else Color(0xFF00D9FF)
                         drawPath(
                             path = path,
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFF00D9FF).copy(alpha = glowAlpha.value),
-                                    Color(0xFF00D9FF).copy(alpha = 0f)
+                                    glowColor.copy(alpha = glowAlpha.value),
+                                    glowColor.copy(alpha = 0f)
                                 ),
                                 center = center,
                                 radius = 40.dp.toPx()
                             )
                         )
 
+                        val arrowColor = if (isAligned) Color(0xFF00FF88) else Color(0xFF00D9FF)
                         drawPath(
                             path = path,
                             brush = Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFF00D9FF),
-                                    Color(0xFF00A8CC)
+                                    arrowColor,
+                                    arrowColor.copy(alpha = 0.8f)
                                 )
                             )
                         )
@@ -584,8 +637,8 @@ fun QiblaCompassScreen(
                         drawLine(
                             brush = Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFF00D9FF),
-                                    Color(0xFF00D9FF).copy(alpha = 0.3f)
+                                    arrowColor,
+                                    arrowColor.copy(alpha = 0.3f)
                                 ),
                                 start = center,
                                 end = Offset(qiblaX, qiblaY)
@@ -908,6 +961,7 @@ fun QiblaFinderApp(
     location: Location?,
     locationAccuracy: Float,
     showCalibration: Boolean,
+    isAligned: Boolean,
     onDismissCalibration: () -> Unit,
     onRequestLocation: () -> Unit
 ) {
@@ -943,6 +997,7 @@ fun QiblaFinderApp(
                     location = location,
                     locationAccuracy = locationAccuracy,
                     showCalibration = showCalibration,
+                    isAligned = isAligned,
                     onDismissCalibration = onDismissCalibration,
                     onRequestLocation = onRequestLocation
                 )

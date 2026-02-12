@@ -7,9 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    
+
     <!-- Qibla Finder Custom Colors -->
     <color name="gold">#FFD4AF37</color>
+    <color name="navy_dark">#FF0A1128</color>
     <color name="dark_navy">#FF0A1128</color>
     <color name="navy">#FF1C2541</color>
     <color name="cyan">#FF00D9FF</color>
