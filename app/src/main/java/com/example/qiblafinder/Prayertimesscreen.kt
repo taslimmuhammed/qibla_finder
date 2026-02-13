@@ -1,5 +1,6 @@
 package com.example.qiblafinder
 
+import android.content.Context
 import android.location.Location
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,9 +38,61 @@ fun PrayerTimesScreen(
     location: Location?,
     onBack: () -> Unit
 ) {
-    var selectedMadhab by remember { mutableStateOf(Madhab.SHAFI) }
-    var selectedCalculationMethod by remember { mutableStateOf(CalculationMethod.MUSLIM_WORLD_LEAGUE) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedPreferences = remember {
+        context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+    }
+
+    // Check if this is first time
+    var showFirstTimeSetup by remember {
+        mutableStateOf(!sharedPreferences.contains("madhab_preference"))
+    }
+
+    // Load saved preferences or use defaults
+    var selectedMadhab by remember {
+        mutableStateOf(
+            Madhab.valueOf(
+                sharedPreferences.getString("madhab_preference", Madhab.SHAFI.name) ?: Madhab.SHAFI.name
+            )
+        )
+    }
+
+    var selectedCalculationMethod by remember {
+        mutableStateOf(
+            try {
+                when (sharedPreferences.getString("method_preference", "MUSLIM_WORLD_LEAGUE")) {
+                    "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+                    "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
+                    "EGYPTIAN" -> CalculationMethod.EGYPTIAN
+                    "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
+                    "KARACHI" -> CalculationMethod.KARACHI
+                    "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
+                    else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+                }
+            } catch (e: Exception) {
+                CalculationMethod.MUSLIM_WORLD_LEAGUE
+            }
+        )
+    }
+
     var showSettings by remember { mutableStateOf(false) }
+
+    // Save preferences function
+    fun savePreferences() {
+        sharedPreferences.edit().apply {
+            putString("madhab_preference", selectedMadhab.name)
+            putString("method_preference", when (selectedCalculationMethod) {
+                CalculationMethod.MUSLIM_WORLD_LEAGUE -> "MUSLIM_WORLD_LEAGUE"
+                CalculationMethod.NORTH_AMERICA -> "NORTH_AMERICA"
+                CalculationMethod.EGYPTIAN -> "EGYPTIAN"
+                CalculationMethod.UMM_AL_QURA -> "UMM_AL_QURA"
+                CalculationMethod.KARACHI -> "KARACHI"
+                CalculationMethod.MOON_SIGHTING_COMMITTEE -> "MOON_SIGHTING_COMMITTEE"
+                else -> "MUSLIM_WORLD_LEAGUE"
+            })
+            apply()
+        }
+    }
 
     val prayerTimes = remember(location, selectedMadhab, selectedCalculationMethod) {
         location?.let { calculatePrayerTimes(it, selectedMadhab, selectedCalculationMethod) }
@@ -165,8 +219,14 @@ fun PrayerTimesScreen(
                 SettingsPanel(
                     selectedMadhab = selectedMadhab,
                     selectedCalculationMethod = selectedCalculationMethod,
-                    onMadhabChange = { selectedMadhab = it },
-                    onCalculationMethodChange = { selectedCalculationMethod = it }
+                    onMadhabChange = {
+                        selectedMadhab = it
+                        savePreferences()
+                    },
+                    onCalculationMethodChange = {
+                        selectedCalculationMethod = it
+                        savePreferences()
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -229,6 +289,18 @@ fun PrayerTimesScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        // First-time setup dialog
+        if (showFirstTimeSetup) {
+            FirstTimeSetupDialog(
+                onComplete = { madhab, method ->
+                    selectedMadhab = madhab
+                    selectedCalculationMethod = method
+                    savePreferences()
+                    showFirstTimeSetup = false
+                }
+            )
         }
     }
 }
@@ -785,5 +857,229 @@ fun calculateTimeUntil(targetTime: Date): String {
     return when {
         hours > 0 -> "${hours}h ${minutes}m"
         else -> "${minutes}m"
+    }
+}
+
+// First-time Setup Dialog
+@Composable
+fun FirstTimeSetupDialog(
+    onComplete: (Madhab, CalculationMethod) -> Unit
+) {
+    var selectedMadhab by remember { mutableStateOf(Madhab.SHAFI) }
+    var selectedMethod by remember { mutableStateOf(CalculationMethod.MUSLIM_WORLD_LEAGUE) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A1128).copy(alpha = 0.97f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF1C2541).copy(alpha = 0.95f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Header
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = Color(0xFFD4AF37),
+                        modifier = Modifier.size(48.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "PRAYER TIME SETTINGS",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        color = Color(0xFFD4AF37),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Please configure your preferences",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Divider(color = Color(0xFFD4AF37).copy(alpha = 0.3f))
+
+                // Madhab Selection
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Asr Calculation Method (Madhab)",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFD4AF37),
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "This determines when Asr prayer time begins",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        lineHeight = 16.sp
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        MadhabOption(
+                            name = "Shafi'i",
+                            madhab = Madhab.SHAFI,
+                            isSelected = selectedMadhab == Madhab.SHAFI,
+                            onClick = { selectedMadhab = Madhab.SHAFI },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        MadhabOption(
+                            name = "Hanafi",
+                            madhab = Madhab.HANAFI,
+                            isSelected = selectedMadhab == Madhab.HANAFI,
+                            onClick = { selectedMadhab = Madhab.HANAFI },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF00D9FF).copy(alpha = 0.1f)
+                        )
+                    ) {
+                        Text(
+                            text = if (selectedMadhab == Madhab.SHAFI) {
+                                "Shafi'i: Asr begins when shadow = object length (earlier time)"
+                            } else {
+                                "Hanafi: Asr begins when shadow = 2× object length (later time)"
+                            },
+                            fontSize = 11.sp,
+                            color = Color(0xFF00D9FF),
+                            lineHeight = 15.sp,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                Divider(color = Color(0xFFD4AF37).copy(alpha = 0.3f))
+
+                // Calculation Method Selection
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Calculation Method",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFD4AF37),
+                        letterSpacing = 1.sp
+                    )
+
+                    Text(
+                        text = "Choose based on your region or local community",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        lineHeight = 16.sp
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CalculationMethodOption(
+                            name = "Muslim World League",
+                            method = CalculationMethod.MUSLIM_WORLD_LEAGUE,
+                            description = "Most countries worldwide",
+                            isSelected = selectedMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE,
+                            onClick = { selectedMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE }
+                        )
+
+                        CalculationMethodOption(
+                            name = "ISNA (North America)",
+                            method = CalculationMethod.NORTH_AMERICA,
+                            description = "USA, Canada",
+                            isSelected = selectedMethod == CalculationMethod.NORTH_AMERICA,
+                            onClick = { selectedMethod = CalculationMethod.NORTH_AMERICA }
+                        )
+
+                        CalculationMethodOption(
+                            name = "Egyptian",
+                            method = CalculationMethod.EGYPTIAN,
+                            description = "Egypt, Syria, Lebanon",
+                            isSelected = selectedMethod == CalculationMethod.EGYPTIAN,
+                            onClick = { selectedMethod = CalculationMethod.EGYPTIAN }
+                        )
+
+                        CalculationMethodOption(
+                            name = "Umm al-Qura",
+                            method = CalculationMethod.UMM_AL_QURA,
+                            description = "Makkah, Saudi Arabia",
+                            isSelected = selectedMethod == CalculationMethod.UMM_AL_QURA,
+                            onClick = { selectedMethod = CalculationMethod.UMM_AL_QURA }
+                        )
+
+                        CalculationMethodOption(
+                            name = "Karachi",
+                            method = CalculationMethod.KARACHI,
+                            description = "Pakistan, Bangladesh, India",
+                            isSelected = selectedMethod == CalculationMethod.KARACHI,
+                            onClick = { selectedMethod = CalculationMethod.KARACHI }
+                        )
+
+                        CalculationMethodOption(
+                            name = "Moonsighting Committee",
+                            method = CalculationMethod.MOON_SIGHTING_COMMITTEE,
+                            description = "Parts of USA",
+                            isSelected = selectedMethod == CalculationMethod.MOON_SIGHTING_COMMITTEE,
+                            onClick = { selectedMethod = CalculationMethod.MOON_SIGHTING_COMMITTEE }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Confirm Button
+                Button(
+                    onClick = { onComplete(selectedMadhab, selectedMethod) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF00D9FF)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text(
+                        text = "SAVE PREFERENCES",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                Text(
+                    text = "You can change these settings anytime from the settings menu",
+                    fontSize = 11.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }

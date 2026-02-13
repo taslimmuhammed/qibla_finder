@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var showCalibrationOverlay by mutableStateOf(false)
     private var isAligned by mutableStateOf(false)
     private var lastAlignmentState by mutableStateOf(false)
+    private var resumeTrigger by mutableIntStateOf(0)
 
     private lateinit var vibrator: Vibrator
 
@@ -123,14 +125,27 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
         checkLocationPermission()
 
+        // Add lifecycle observer to detect when coming back from settings
+        lifecycle.addObserver(object : androidx.lifecycle.LifecycleEventObserver {
+            override fun onStateChanged(source: androidx.lifecycle.LifecycleOwner, event: androidx.lifecycle.Lifecycle.Event) {
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    // Check location when resuming
+                    checkAndUpdateLocationState()
+                }
+            }
+        })
+
         setContent {
             QiblaFinderTheme {
                 val navController = rememberNavController()
 
-                // Check if location services are enabled
+                // Check if location services are enabled - rechecks when resumeTrigger changes
                 val locationManager = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
-                val isLocationEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
-                        locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+                val isLocationEnabled = remember(resumeTrigger) {
+                    val isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+                    val isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+                    isGpsEnabled || isNetworkEnabled
+                }
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -169,6 +184,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private fun openLocationSettings() {
         val intent = android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
         startActivity(intent)
+    }
+
+    private fun checkAndUpdateLocationState() {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+        val isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+        val isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+
+        // Trigger recomposition
+        resumeTrigger++
+
+        if ((isGpsEnabled || isNetworkEnabled) && isLocationPermissionGranted && userLocation == null) {
+            getUserLocation()
+        }
     }
 
     private fun checkLocationPermission() {
