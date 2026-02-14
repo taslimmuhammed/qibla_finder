@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.qiblafinder"
+    namespace = "com.taslim.qiblafinder"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.example.qiblafinder"
+        applicationId = "com.taslim.qiblafinder"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

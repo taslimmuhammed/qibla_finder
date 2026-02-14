@@ -1,4 +1,4 @@
-package com.example.qiblafinder
+package com.taslim.qiblafinder
 
 import android.content.BroadcastReceiver
 import android.content.Context
