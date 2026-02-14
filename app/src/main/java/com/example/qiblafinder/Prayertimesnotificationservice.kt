@@ -113,7 +113,6 @@ class PrayerTimesNotificationService : Service() {
             updateNotificationLayout(notificationLayout, location, madhab, calculationMethod)
         } else {
             // Show placeholder
-            notificationLayout.setTextViewText(R.id.notification_title, "Prayer Times")
             notificationLayout.setTextViewText(R.id.fajr_time, "—")
             notificationLayout.setTextViewText(R.id.dhuhr_time, "—")
             notificationLayout.setTextViewText(R.id.asr_time, "—")
@@ -147,40 +146,44 @@ class PrayerTimesNotificationService : Service() {
         params.madhab = madhab
         
         val prayerTimes = PrayerTimes(coordinates, date, params)
-        val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
-        val currentPrayer = prayerTimes.currentPrayer()
+        val timeFormat = SimpleDateFormat("h:mm", Locale.getDefault())
         val nextPrayer = prayerTimes.nextPrayer()
-        
-        // Set title
-        layout.setTextViewText(R.id.notification_title, "Today's Prayer Times")
         
         // Set prayer times
         layout.setTextViewText(R.id.fajr_time, timeFormat.format(prayerTimes.fajr))
-        layout.setTextViewText(R.id.sunrise_time, timeFormat.format(prayerTimes.sunrise))
         layout.setTextViewText(R.id.dhuhr_time, timeFormat.format(prayerTimes.dhuhr))
         layout.setTextViewText(R.id.asr_time, timeFormat.format(prayerTimes.asr))
         layout.setTextViewText(R.id.maghrib_time, timeFormat.format(prayerTimes.maghrib))
         layout.setTextViewText(R.id.isha_time, timeFormat.format(prayerTimes.isha))
         
-        // Reset all backgrounds to default
-        layout.setInt(R.id.fajr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-        layout.setInt(R.id.sunrise_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-        layout.setInt(R.id.dhuhr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-        layout.setInt(R.id.asr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-        layout.setInt(R.id.maghrib_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-        layout.setInt(R.id.isha_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        // Prayer data: container ID, label ID, time ID
+        data class PrayerViewIds(val container: Int, val label: Int, val time: Int)
+        val prayerViews = mapOf(
+            Prayer.FAJR to PrayerViewIds(R.id.fajr_container, R.id.fajr_label, R.id.fajr_time),
+            Prayer.DHUHR to PrayerViewIds(R.id.dhuhr_container, R.id.dhuhr_label, R.id.dhuhr_time),
+            Prayer.ASR to PrayerViewIds(R.id.asr_container, R.id.asr_label, R.id.asr_time),
+            Prayer.MAGHRIB to PrayerViewIds(R.id.maghrib_container, R.id.maghrib_label, R.id.maghrib_time),
+            Prayer.ISHA to PrayerViewIds(R.id.isha_container, R.id.isha_label, R.id.isha_time)
+        )
         
-        // Highlight next prayer with cyan color
-        nextPrayer?.let { prayer ->
-            val highlightColor = android.graphics.Color.parseColor("#3300D9FF") // Cyan with transparency
-            when (prayer) {
-                Prayer.FAJR -> layout.setInt(R.id.fajr_container, "setBackgroundColor", highlightColor)
-                Prayer.SUNRISE -> layout.setInt(R.id.sunrise_container, "setBackgroundColor", highlightColor)
-                Prayer.DHUHR -> layout.setInt(R.id.dhuhr_container, "setBackgroundColor", highlightColor)
-                Prayer.ASR -> layout.setInt(R.id.asr_container, "setBackgroundColor", highlightColor)
-                Prayer.MAGHRIB -> layout.setInt(R.id.maghrib_container, "setBackgroundColor", highlightColor)
-                Prayer.ISHA -> layout.setInt(R.id.isha_container, "setBackgroundColor", highlightColor)
-                else -> {}
+        val defaultLabelColor = android.graphics.Color.parseColor("#99FFFFFF")
+        val defaultTimeColor = android.graphics.Color.parseColor("#FFFFFFFF")
+        val highlightGold = android.graphics.Color.parseColor("#FFD4AF37")
+        
+        // Reset all containers and apply highlight to next prayer
+        for ((prayer, ids) in prayerViews) {
+            val isNext = nextPrayer == prayer
+            // If next prayer is SUNRISE, highlight Dhuhr instead
+            val isHighlighted = isNext || (nextPrayer == Prayer.SUNRISE && prayer == Prayer.DHUHR)
+            
+            if (isHighlighted) {
+                layout.setInt(ids.container, "setBackgroundResource", R.drawable.notification_highlight_bg)
+                layout.setTextColor(ids.label, highlightGold)
+                layout.setTextColor(ids.time, highlightGold)
+            } else {
+                layout.setInt(ids.container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+                layout.setTextColor(ids.label, defaultLabelColor)
+                layout.setTextColor(ids.time, defaultTimeColor)
             }
         }
     }
