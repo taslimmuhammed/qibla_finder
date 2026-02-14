@@ -51,7 +51,7 @@ class PrayerTimesNotificationService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Prayer Times",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Daily prayer times notification"
                 setShowBadge(false)
@@ -121,7 +121,7 @@ class PrayerTimesNotificationService : Service() {
         }
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.star_on)
+            .setSmallIcon(R.drawable.ic_notification)
             .setCustomContentView(notificationLayout)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
