@@ -51,11 +51,13 @@ class PrayerTimesNotificationService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Prayer Times",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Displays daily prayer times"
+                description = "Daily prayer times notification"
                 setShowBadge(false)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setSound(null, null)
+                enableVibration(false)
             }
             
             val notificationManager = getSystemService(NotificationManager::class.java)
@@ -86,16 +88,6 @@ class PrayerTimesNotificationService : Service() {
         val latitude = locationPrefs.getFloat("latitude", 0f).toDouble()
         val longitude = locationPrefs.getFloat("longitude", 0f).toDouble()
         
-        val notificationText = if (latitude != 0.0 && longitude != 0.0) {
-            val location = Location("").apply {
-                this.latitude = latitude
-                this.longitude = longitude
-            }
-            calculatePrayerTimesText(location, madhab, calculationMethod)
-        } else {
-            "Waiting for location..."
-        }
-        
         // Intent to open app
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -107,21 +99,48 @@ class PrayerTimesNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
+        // Create custom notification layout
+        val notificationLayout = android.widget.RemoteViews(
+            packageName,
+            R.layout.notification_prayer_times
+        )
+        
+        if (latitude != 0.0 && longitude != 0.0) {
+            val location = Location("").apply {
+                this.latitude = latitude
+                this.longitude = longitude
+            }
+            updateNotificationLayout(notificationLayout, location, madhab, calculationMethod)
+        } else {
+            // Show placeholder
+            notificationLayout.setTextViewText(R.id.notification_title, "Prayer Times")
+            notificationLayout.setTextViewText(R.id.fajr_time, "—")
+            notificationLayout.setTextViewText(R.id.dhuhr_time, "—")
+            notificationLayout.setTextViewText(R.id.asr_time, "—")
+            notificationLayout.setTextViewText(R.id.maghrib_time, "—")
+            notificationLayout.setTextViewText(R.id.isha_time, "—")
+        }
+        
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("🕌 Today's Prayer Times")
-            .setContentText(notificationText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setOngoing(true) // Makes it persistent/non-dismissible
+            .setSmallIcon(android.R.drawable.star_on)
+            .setCustomContentView(notificationLayout)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pendingIntent)
+            .setShowWhen(false)
             .build()
     }
     
-    private fun calculatePrayerTimesText(location: Location, madhab: Madhab, calculationMethod: CalculationMethod): String {
+    private fun updateNotificationLayout(
+        layout: android.widget.RemoteViews,
+        location: Location,
+        madhab: Madhab,
+        calculationMethod: CalculationMethod
+    ) {
         val coordinates = Coordinates(location.latitude, location.longitude)
         val date = DateComponents.from(Date())
         val params = calculationMethod.parameters
@@ -129,17 +148,37 @@ class PrayerTimesNotificationService : Service() {
         
         val prayerTimes = PrayerTimes(coordinates, date, params)
         val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+        val currentPrayer = prayerTimes.currentPrayer()
+        val nextPrayer = prayerTimes.nextPrayer()
         
-        return buildString {
-            append("Fajr: ${timeFormat.format(prayerTimes.fajr)}")
-            append(" • ")
-            append("Dhuhr: ${timeFormat.format(prayerTimes.dhuhr)}")
-            append(" • ")
-            append("Asr: ${timeFormat.format(prayerTimes.asr)}")
-            append(" • ")
-            append("Maghrib: ${timeFormat.format(prayerTimes.maghrib)}")
-            append(" • ")
-            append("Isha: ${timeFormat.format(prayerTimes.isha)}")
+        // Set title
+        layout.setTextViewText(R.id.notification_title, "Today's Prayer Times")
+        
+        // Set prayer times
+        layout.setTextViewText(R.id.fajr_time, timeFormat.format(prayerTimes.fajr))
+        layout.setTextViewText(R.id.dhuhr_time, timeFormat.format(prayerTimes.dhuhr))
+        layout.setTextViewText(R.id.asr_time, timeFormat.format(prayerTimes.asr))
+        layout.setTextViewText(R.id.maghrib_time, timeFormat.format(prayerTimes.maghrib))
+        layout.setTextViewText(R.id.isha_time, timeFormat.format(prayerTimes.isha))
+        
+        // Reset all backgrounds to default
+        layout.setInt(R.id.fajr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        layout.setInt(R.id.dhuhr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        layout.setInt(R.id.asr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        layout.setInt(R.id.maghrib_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        layout.setInt(R.id.isha_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        
+        // Highlight next prayer with cyan color
+        nextPrayer?.let { prayer ->
+            val highlightColor = android.graphics.Color.parseColor("#3300D9FF") // Cyan with transparency
+            when (prayer) {
+                Prayer.FAJR -> layout.setInt(R.id.fajr_container, "setBackgroundColor", highlightColor)
+                Prayer.DHUHR -> layout.setInt(R.id.dhuhr_container, "setBackgroundColor", highlightColor)
+                Prayer.ASR -> layout.setInt(R.id.asr_container, "setBackgroundColor", highlightColor)
+                Prayer.MAGHRIB -> layout.setInt(R.id.maghrib_container, "setBackgroundColor", highlightColor)
+                Prayer.ISHA -> layout.setInt(R.id.isha_container, "setBackgroundColor", highlightColor)
+                else -> {}
+            }
         }
     }
     

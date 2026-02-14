@@ -2,6 +2,8 @@ package com.example.qiblafinder
 
 import android.content.Context
 import android.location.Location
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -39,15 +41,17 @@ fun PrayerTimesScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? android.app.Activity
+    
     val sharedPreferences = remember {
         context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
     }
-
+    
     // Check if this is first time
     var showFirstTimeSetup by remember {
         mutableStateOf(!sharedPreferences.contains("madhab_preference"))
     }
-
+    
     // Load saved preferences or use defaults
     var selectedMadhab by remember {
         mutableStateOf(
@@ -56,7 +60,7 @@ fun PrayerTimesScreen(
             )
         )
     }
-
+    
     var selectedCalculationMethod by remember {
         mutableStateOf(
             try {
@@ -74,9 +78,22 @@ fun PrayerTimesScreen(
             }
         )
     }
-
+    
     var showSettings by remember { mutableStateOf(false) }
-
+    
+    // Notification permission launcher
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // Permission granted, start notification service
+            PrayerTimesNotificationService.startService(context)
+        } else {
+            // Permission denied, still start service (will work on older Android versions)
+            PrayerTimesNotificationService.startService(context)
+        }
+    }
+    
     // Save preferences function
     fun savePreferences() {
         sharedPreferences.edit().apply {
@@ -92,20 +109,48 @@ fun PrayerTimesScreen(
             })
             apply()
         }
+        
+        // Save location data for notification
+        location?.let { loc ->
+            context.getSharedPreferences("location_data", Context.MODE_PRIVATE).edit().apply {
+                putFloat("latitude", loc.latitude.toFloat())
+                putFloat("longitude", loc.longitude.toFloat())
+                apply()
+            }
+            
+            // Request notification permission and start service
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                // Android 13+ requires runtime permission
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    // Already granted
+                    PrayerTimesNotificationService.startService(context)
+                } else {
+                    // Request permission
+                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                // Android 12 and below - no permission needed
+                PrayerTimesNotificationService.startService(context)
+            }
+        }
     }
-
+    
     val prayerTimes = remember(location, selectedMadhab, selectedCalculationMethod) {
         location?.let { calculatePrayerTimes(it, selectedMadhab, selectedCalculationMethod) }
     }
-
+    
     val currentPrayer = remember(prayerTimes) {
         prayerTimes?.currentPrayer()
     }
-
+    
     val nextPrayer = remember(prayerTimes) {
         prayerTimes?.nextPrayer()
     }
-
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -133,7 +178,7 @@ fun PrayerTimesScreen(
                 )
             }
         }
-
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -141,7 +186,7 @@ fun PrayerTimesScreen(
                 .padding(horizontal = 24.dp)
         ) {
             Spacer(modifier = Modifier.height(48.dp))
-
+            
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -149,7 +194,7 @@ fun PrayerTimesScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Spacer(modifier = Modifier.width(48.dp))
-
+                
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f)
@@ -162,7 +207,7 @@ fun PrayerTimesScreen(
                         color = Color(0xFFD4AF37),
                         fontFamily = FontFamily.Serif
                     )
-
+                    
                     Text(
                         text = "أوقات الصلاة",
                         fontSize = 20.sp,
@@ -170,7 +215,7 @@ fun PrayerTimesScreen(
                         fontFamily = FontFamily.Serif
                     )
                 }
-
+                
                 IconButton(onClick = { showSettings = !showSettings }) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -179,9 +224,9 @@ fun PrayerTimesScreen(
                     )
                 }
             }
-
+            
             Spacer(modifier = Modifier.height(24.dp))
-
+            
             // Current Date
             val dateFormat = remember { SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()) }
             val islamicDate = remember {
@@ -192,7 +237,7 @@ fun PrayerTimesScreen(
                     dateFormat.format(gregorianDate)
                 } ?: ""
             }
-
+            
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFF1C2541).copy(alpha = 0.6f)
@@ -211,27 +256,27 @@ fun PrayerTimesScreen(
                     )
                 }
             }
-
+            
             Spacer(modifier = Modifier.height(24.dp))
-
+            
             // Settings Panel
             if (showSettings) {
                 SettingsPanel(
                     selectedMadhab = selectedMadhab,
                     selectedCalculationMethod = selectedCalculationMethod,
-                    onMadhabChange = {
+                    onMadhabChange = { 
                         selectedMadhab = it
                         savePreferences()
                     },
-                    onCalculationMethodChange = {
+                    onCalculationMethodChange = { 
                         selectedCalculationMethod = it
                         savePreferences()
                     }
                 )
-
+                
                 Spacer(modifier = Modifier.height(24.dp))
             }
-
+            
             // Current Prayer Indicator
             if (prayerTimes != null && currentPrayer != null) {
                 CurrentPrayerCard(
@@ -239,10 +284,10 @@ fun PrayerTimesScreen(
                     nextPrayer = nextPrayer,
                     prayerTimes = prayerTimes
                 )
-
+                
                 Spacer(modifier = Modifier.height(24.dp))
             }
-
+            
             // Prayer Times List
             if (prayerTimes != null) {
                 PrayerTimesList(prayerTimes = prayerTimes, currentPrayer = currentPrayer)
@@ -264,9 +309,9 @@ fun PrayerTimesScreen(
                             tint = Color(0xFFFFAA00),
                             modifier = Modifier.size(48.dp)
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
-
+                        
                         Text(
                             text = "Location Required",
                             fontSize = 18.sp,
@@ -274,9 +319,9 @@ fun PrayerTimesScreen(
                             color = Color.White,
                             letterSpacing = 1.sp
                         )
-
+                        
                         Spacer(modifier = Modifier.height(8.dp))
-
+                        
                         Text(
                             text = "Please enable location services to calculate accurate prayer times for your area.",
                             fontSize = 14.sp,
@@ -287,10 +332,10 @@ fun PrayerTimesScreen(
                     }
                 }
             }
-
+            
             Spacer(modifier = Modifier.height(32.dp))
         }
-
+        
         // First-time setup dialog
         if (showFirstTimeSetup) {
             FirstTimeSetupDialog(
@@ -321,7 +366,7 @@ fun CurrentPrayerCard(
         ),
         label = "glow"
     )
-
+    
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -353,7 +398,7 @@ fun CurrentPrayerCard(
                         )
                     )
                 }
-
+                
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -367,9 +412,9 @@ fun CurrentPrayerCard(
                         color = Color(0xFFD4AF37).copy(alpha = 0.7f),
                         fontWeight = FontWeight.Light
                     )
-
+                    
                     Spacer(modifier = Modifier.height(16.dp))
-
+                    
                     Text(
                         text = currentPrayer?.name ?: "Unknown",
                         fontSize = 40.sp,
@@ -377,9 +422,9 @@ fun CurrentPrayerCard(
                         color = Color(0xFF00D9FF),
                         letterSpacing = 2.sp
                     )
-
+                    
                     Spacer(modifier = Modifier.height(8.dp))
-
+                    
                     Text(
                         text = getPrayerArabicName(currentPrayer),
                         fontSize = 24.sp,
@@ -389,12 +434,12 @@ fun CurrentPrayerCard(
                 }
             }
         }
-
+        
         // Next Prayer Card (separate)
         if (nextPrayer != null) {
             val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
             val timeUntil = calculateTimeUntil(nextPrayerTime)
-
+            
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFF1C2541).copy(alpha = 0.7f)
@@ -424,7 +469,7 @@ fun CurrentPrayerCard(
                             letterSpacing = 1.sp
                         )
                     }
-
+                    
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "IN",
@@ -460,7 +505,7 @@ fun PrayerTimesList(
         Prayer.MAGHRIB to prayerTimes.maghrib,
         Prayer.ISHA to prayerTimes.isha
     )
-
+    
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -486,13 +531,13 @@ fun PrayerTimeItem(
     } else {
         Color(0xFF1C2541).copy(alpha = 0.6f)
     }
-
+    
     val borderColor = if (isCurrent) {
         Color(0xFF00D9FF).copy(alpha = 0.6f)
     } else {
         Color.Transparent
     }
-
+    
     Card(
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor
@@ -513,7 +558,7 @@ fun PrayerTimeItem(
             ) {
                 // Prayer Icon
                 PrayerIcon(prayer = prayer, isCurrent = isCurrent)
-
+                
                 Column {
                     Text(
                         text = prayer.name,
@@ -522,7 +567,7 @@ fun PrayerTimeItem(
                         color = if (isCurrent) Color(0xFF00D9FF) else Color.White,
                         letterSpacing = 1.sp
                     )
-
+                    
                     Text(
                         text = getPrayerArabicName(prayer),
                         fontSize = 14.sp,
@@ -531,7 +576,7 @@ fun PrayerTimeItem(
                     )
                 }
             }
-
+            
             Text(
                 text = timeFormat.format(time),
                 fontSize = 20.sp,
@@ -546,7 +591,7 @@ fun PrayerTimeItem(
 @Composable
 fun PrayerIcon(prayer: Prayer, isCurrent: Boolean) {
     val iconColor = if (isCurrent) Color(0xFF00D9FF) else Color(0xFFD4AF37)
-
+    
     Box(
         modifier = Modifier
             .size(48.dp)
@@ -565,7 +610,7 @@ fun PrayerIcon(prayer: Prayer, isCurrent: Boolean) {
             Prayer.ISHA -> Icons.Default.NightsStay
             else -> Icons.Default.AccessTime
         }
-
+        
         Icon(
             imageVector = icon,
             contentDescription = prayer.name,
@@ -599,7 +644,7 @@ fun SettingsPanel(
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFD4AF37)
             )
-
+            
             // Madhab Selection
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -608,7 +653,7 @@ fun SettingsPanel(
                     letterSpacing = 1.sp,
                     color = Color.White.copy(alpha = 0.7f)
                 )
-
+                
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MadhabOption(
                         name = "Shafi",
@@ -617,7 +662,7 @@ fun SettingsPanel(
                         onClick = { onMadhabChange(Madhab.SHAFI) },
                         modifier = Modifier.weight(1f)
                     )
-
+                    
                     MadhabOption(
                         name = "Hanafi",
                         madhab = Madhab.HANAFI,
@@ -626,7 +671,7 @@ fun SettingsPanel(
                         modifier = Modifier.weight(1f)
                     )
                 }
-
+                
                 Text(
                     text = if (selectedMadhab == Madhab.SHAFI) {
                         "Standard: Shadow = Object length"
@@ -638,9 +683,9 @@ fun SettingsPanel(
                     lineHeight = 16.sp
                 )
             }
-
+            
             Divider(color = Color(0xFFD4AF37).copy(alpha = 0.2f))
-
+            
             // Calculation Method
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -649,7 +694,7 @@ fun SettingsPanel(
                     letterSpacing = 1.sp,
                     color = Color.White.copy(alpha = 0.7f)
                 )
-
+                
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CalculationMethodOption(
                         name = "Muslim World League",
@@ -658,7 +703,7 @@ fun SettingsPanel(
                         isSelected = selectedCalculationMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE,
                         onClick = { onCalculationMethodChange(CalculationMethod.MUSLIM_WORLD_LEAGUE) }
                     )
-
+                    
                     CalculationMethodOption(
                         name = "Islamic Society of North America",
                         method = CalculationMethod.NORTH_AMERICA,
@@ -666,7 +711,7 @@ fun SettingsPanel(
                         isSelected = selectedCalculationMethod == CalculationMethod.NORTH_AMERICA,
                         onClick = { onCalculationMethodChange(CalculationMethod.NORTH_AMERICA) }
                     )
-
+                    
                     CalculationMethodOption(
                         name = "Egyptian General Authority",
                         method = CalculationMethod.EGYPTIAN,
@@ -674,7 +719,7 @@ fun SettingsPanel(
                         isSelected = selectedCalculationMethod == CalculationMethod.EGYPTIAN,
                         onClick = { onCalculationMethodChange(CalculationMethod.EGYPTIAN) }
                     )
-
+                    
                     CalculationMethodOption(
                         name = "Umm al-Qura University",
                         method = CalculationMethod.UMM_AL_QURA,
@@ -682,7 +727,7 @@ fun SettingsPanel(
                         isSelected = selectedCalculationMethod == CalculationMethod.UMM_AL_QURA,
                         onClick = { onCalculationMethodChange(CalculationMethod.UMM_AL_QURA) }
                     )
-
+                    
                     CalculationMethodOption(
                         name = "University of Islamic Sciences, Karachi",
                         method = CalculationMethod.KARACHI,
@@ -690,7 +735,7 @@ fun SettingsPanel(
                         isSelected = selectedCalculationMethod == CalculationMethod.KARACHI,
                         onClick = { onCalculationMethodChange(CalculationMethod.KARACHI) }
                     )
-
+                    
                     CalculationMethodOption(
                         name = "Moonsighting Committee",
                         method = CalculationMethod.MOON_SIGHTING_COMMITTEE,
@@ -781,7 +826,7 @@ fun CalculationMethodOption(
                     color = if (isSelected) Color(0xFF00D9FF) else Color.White,
                     letterSpacing = 0.5.sp
                 )
-
+                
                 Text(
                     text = description,
                     fontSize = 11.sp,
@@ -793,7 +838,7 @@ fun CalculationMethodOption(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-
+            
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
@@ -817,7 +862,7 @@ fun calculatePrayerTimes(
     val date = DateComponents.from(Date())
     val params = calculationMethod.parameters
     params.madhab = madhab
-
+    
     return PrayerTimes(coordinates, date, params)
 }
 
@@ -848,12 +893,12 @@ fun getPrayerArabicName(prayer: Prayer?): String {
 fun calculateTimeUntil(targetTime: Date): String {
     val now = Date()
     val diff = targetTime.time - now.time
-
+    
     if (diff < 0) return "Passed"
-
+    
     val hours = (diff / (1000 * 60 * 60)).toInt()
     val minutes = ((diff / (1000 * 60)) % 60).toInt()
-
+    
     return when {
         hours > 0 -> "${hours}h ${minutes}m"
         else -> "${minutes}m"
@@ -867,7 +912,7 @@ fun FirstTimeSetupDialog(
 ) {
     var selectedMadhab by remember { mutableStateOf(Madhab.SHAFI) }
     var selectedMethod by remember { mutableStateOf(CalculationMethod.MUSLIM_WORLD_LEAGUE) }
-
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -900,9 +945,9 @@ fun FirstTimeSetupDialog(
                         tint = Color(0xFFD4AF37),
                         modifier = Modifier.size(48.dp)
                     )
-
+                    
                     Spacer(modifier = Modifier.height(12.dp))
-
+                    
                     Text(
                         text = "PRAYER TIME SETTINGS",
                         fontSize = 20.sp,
@@ -911,9 +956,9 @@ fun FirstTimeSetupDialog(
                         color = Color(0xFFD4AF37),
                         textAlign = TextAlign.Center
                     )
-
+                    
                     Spacer(modifier = Modifier.height(8.dp))
-
+                    
                     Text(
                         text = "Please configure your preferences",
                         fontSize = 14.sp,
@@ -921,9 +966,9 @@ fun FirstTimeSetupDialog(
                         textAlign = TextAlign.Center
                     )
                 }
-
+                
                 Divider(color = Color(0xFFD4AF37).copy(alpha = 0.3f))
-
+                
                 // Madhab Selection
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -933,14 +978,14 @@ fun FirstTimeSetupDialog(
                         color = Color(0xFFD4AF37),
                         letterSpacing = 1.sp
                     )
-
+                    
                     Text(
                         text = "This determines when Asr prayer time begins",
                         fontSize = 12.sp,
                         color = Color.White.copy(alpha = 0.7f),
                         lineHeight = 16.sp
                     )
-
+                    
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -952,7 +997,7 @@ fun FirstTimeSetupDialog(
                             onClick = { selectedMadhab = Madhab.SHAFI },
                             modifier = Modifier.weight(1f)
                         )
-
+                        
                         MadhabOption(
                             name = "Hanafi",
                             madhab = Madhab.HANAFI,
@@ -961,7 +1006,7 @@ fun FirstTimeSetupDialog(
                             modifier = Modifier.weight(1f)
                         )
                     }
-
+                    
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFF00D9FF).copy(alpha = 0.1f)
@@ -980,9 +1025,9 @@ fun FirstTimeSetupDialog(
                         )
                     }
                 }
-
+                
                 Divider(color = Color(0xFFD4AF37).copy(alpha = 0.3f))
-
+                
                 // Calculation Method Selection
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -992,14 +1037,14 @@ fun FirstTimeSetupDialog(
                         color = Color(0xFFD4AF37),
                         letterSpacing = 1.sp
                     )
-
+                    
                     Text(
                         text = "Choose based on your region or local community",
                         fontSize = 12.sp,
                         color = Color.White.copy(alpha = 0.7f),
                         lineHeight = 16.sp
                     )
-
+                    
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         CalculationMethodOption(
                             name = "Muslim World League",
@@ -1008,7 +1053,7 @@ fun FirstTimeSetupDialog(
                             isSelected = selectedMethod == CalculationMethod.MUSLIM_WORLD_LEAGUE,
                             onClick = { selectedMethod = CalculationMethod.MUSLIM_WORLD_LEAGUE }
                         )
-
+                        
                         CalculationMethodOption(
                             name = "ISNA (North America)",
                             method = CalculationMethod.NORTH_AMERICA,
@@ -1016,7 +1061,7 @@ fun FirstTimeSetupDialog(
                             isSelected = selectedMethod == CalculationMethod.NORTH_AMERICA,
                             onClick = { selectedMethod = CalculationMethod.NORTH_AMERICA }
                         )
-
+                        
                         CalculationMethodOption(
                             name = "Egyptian",
                             method = CalculationMethod.EGYPTIAN,
@@ -1024,7 +1069,7 @@ fun FirstTimeSetupDialog(
                             isSelected = selectedMethod == CalculationMethod.EGYPTIAN,
                             onClick = { selectedMethod = CalculationMethod.EGYPTIAN }
                         )
-
+                        
                         CalculationMethodOption(
                             name = "Umm al-Qura",
                             method = CalculationMethod.UMM_AL_QURA,
@@ -1032,7 +1077,7 @@ fun FirstTimeSetupDialog(
                             isSelected = selectedMethod == CalculationMethod.UMM_AL_QURA,
                             onClick = { selectedMethod = CalculationMethod.UMM_AL_QURA }
                         )
-
+                        
                         CalculationMethodOption(
                             name = "Karachi",
                             method = CalculationMethod.KARACHI,
@@ -1040,7 +1085,7 @@ fun FirstTimeSetupDialog(
                             isSelected = selectedMethod == CalculationMethod.KARACHI,
                             onClick = { selectedMethod = CalculationMethod.KARACHI }
                         )
-
+                        
                         CalculationMethodOption(
                             name = "Moonsighting Committee",
                             method = CalculationMethod.MOON_SIGHTING_COMMITTEE,
@@ -1050,12 +1095,14 @@ fun FirstTimeSetupDialog(
                         )
                     }
                 }
-
+                
                 Spacer(modifier = Modifier.height(8.dp))
-
+                
                 // Confirm Button
                 Button(
-                    onClick = { onComplete(selectedMadhab, selectedMethod) },
+                    onClick = { 
+                        onComplete(selectedMadhab, selectedMethod)
+                    },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF00D9FF)
                     ),
@@ -1064,13 +1111,13 @@ fun FirstTimeSetupDialog(
                         .height(56.dp)
                 ) {
                     Text(
-                        text = "SAVE PREFERENCES",
-                        fontSize = 15.sp,
+                        text = "SAVE & ENABLE NOTIFICATION",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
                 }
-
+                
                 Text(
                     text = "You can change these settings anytime from the settings menu",
                     fontSize = 11.sp,

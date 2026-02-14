@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#FF1C2541"
+    android:padding="12dp">
+    
+    <!-- Title -->
+    <TextView
+        android:id="@+id/notification_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Today's Prayer Times"
+        android:textColor="#FFD4AF37"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="8dp"
+        android:gravity="center"/>
+    
+    <!-- Prayer Times Grid -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#FF0A1128"
+        android:padding="8dp">
+        
+        <!-- Fajr -->
+        <LinearLayout
+            android:id="@+id/fajr_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Fajr"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/fajr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="5:30 AM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+        
+        <!-- Dhuhr -->
+        <LinearLayout
+            android:id="@+id/dhuhr_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Dhuhr"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/dhuhr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:45 PM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+        
+        <!-- Asr -->
+        <LinearLayout
+            android:id="@+id/asr_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Asr"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/asr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3:50 PM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+        
+        <!-- Maghrib -->
+        <LinearLayout
+            android:id="@+id/maghrib_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Maghrib"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/maghrib_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="6:20 PM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+        
+        <!-- Isha -->
+        <LinearLayout
+            android:id="@+id/isha_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Isha"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/isha_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="7:45 PM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

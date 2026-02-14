@@ -7,6 +7,15 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
+    <!-- Vibration permission for haptic feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    
+    <!-- Notification permission for prayer times -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
     <!-- Sensor permissions -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />
@@ -32,6 +41,33 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- Prayer Times Notification Service -->
+        <service
+            android:name=".PrayerTimesNotificationService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Prayer times display" />
+        </service>
+        
+        <!-- Boot receiver to restart notification after device restart -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Daily update receiver -->
+        <receiver
+            android:name=".DailyUpdateReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
