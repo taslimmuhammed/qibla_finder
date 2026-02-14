@@ -482,8 +482,12 @@ fun QiblaCompassScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(32.dp),
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 16.dp, bottom = 8.dp)
         ) {
+            Spacer(modifier = Modifier.height(16.dp))
             // Title
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

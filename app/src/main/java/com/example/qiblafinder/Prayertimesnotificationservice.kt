@@ -156,6 +156,7 @@ class PrayerTimesNotificationService : Service() {
         
         // Set prayer times
         layout.setTextViewText(R.id.fajr_time, timeFormat.format(prayerTimes.fajr))
+        layout.setTextViewText(R.id.sunrise_time, timeFormat.format(prayerTimes.sunrise))
         layout.setTextViewText(R.id.dhuhr_time, timeFormat.format(prayerTimes.dhuhr))
         layout.setTextViewText(R.id.asr_time, timeFormat.format(prayerTimes.asr))
         layout.setTextViewText(R.id.maghrib_time, timeFormat.format(prayerTimes.maghrib))
@@ -163,6 +164,7 @@ class PrayerTimesNotificationService : Service() {
         
         // Reset all backgrounds to default
         layout.setInt(R.id.fajr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+        layout.setInt(R.id.sunrise_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
         layout.setInt(R.id.dhuhr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
         layout.setInt(R.id.asr_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
         layout.setInt(R.id.maghrib_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
@@ -173,6 +175,7 @@ class PrayerTimesNotificationService : Service() {
             val highlightColor = android.graphics.Color.parseColor("#3300D9FF") // Cyan with transparency
             when (prayer) {
                 Prayer.FAJR -> layout.setInt(R.id.fajr_container, "setBackgroundColor", highlightColor)
+                Prayer.SUNRISE -> layout.setInt(R.id.sunrise_container, "setBackgroundColor", highlightColor)
                 Prayer.DHUHR -> layout.setInt(R.id.dhuhr_container, "setBackgroundColor", highlightColor)
                 Prayer.ASR -> layout.setInt(R.id.asr_container, "setBackgroundColor", highlightColor)
                 Prayer.MAGHRIB -> layout.setInt(R.id.maghrib_container, "setBackgroundColor", highlightColor)

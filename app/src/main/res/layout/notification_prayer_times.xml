@@ -55,6 +55,35 @@
                 android:fontFamily="monospace"/>
         </LinearLayout>
         
+        <!-- Sunrise -->
+        <LinearLayout
+            android:id="@+id/sunrise_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="6dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical">
+            
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sunrise"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+            
+            <TextView
+                android:id="@+id/sunrise_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="6:45 AM"
+                android:textColor="#FFD4AF37"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </LinearLayout>
+        
         <!-- Dhuhr -->
         <LinearLayout
             android:id="@+id/dhuhr_container"
