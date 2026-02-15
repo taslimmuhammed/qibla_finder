@@ -2,13 +2,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:background="#FF000000"
     android:paddingLeft="4dp"
     android:paddingRight="4dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp"
-    android:baselineAligned="false">
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
     <!-- Hidden title (kept for code compatibility) -->
     <TextView
@@ -17,184 +16,193 @@
         android:layout_height="0dp"
         android:visibility="gone"/>
 
-    <!-- Fajr Column -->
+    <!-- Prayer times grid -->
     <LinearLayout
-        android:id="@+id/fajr_container"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:layout_marginLeft="2dp"
-        android:layout_marginRight="2dp">
+        android:orientation="horizontal"
+        android:baselineAligned="false">
 
-        <TextView
-            android:id="@+id/fajr_label"
-            android:layout_width="wrap_content"
+        <!-- Fajr Column -->
+        <LinearLayout
+            android:id="@+id/fajr_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Fajr"
-            android:textColor="#99FFFFFF"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.05"
-            android:gravity="center"/>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp">
 
-        <TextView
-            android:id="@+id/fajr_time"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/fajr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fajr"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:gravity="center"/>
+
+            <TextView
+                android:id="@+id/fajr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="5:30"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="3dp"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- Dhuhr Column -->
+        <LinearLayout
+            android:id="@+id/dhuhr_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="5:30"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:layout_marginTop="3dp"
-            android:gravity="center"/>
-    </LinearLayout>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp">
 
-    <!-- Dhuhr Column -->
-    <LinearLayout
-        android:id="@+id/dhuhr_container"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:layout_marginLeft="2dp"
-        android:layout_marginRight="2dp">
+            <TextView
+                android:id="@+id/dhuhr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dhuhr"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:gravity="center"/>
 
-        <TextView
-            android:id="@+id/dhuhr_label"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/dhuhr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:45"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="3dp"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- Asr Column -->
+        <LinearLayout
+            android:id="@+id/asr_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Dhuhr"
-            android:textColor="#99FFFFFF"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.05"
-            android:gravity="center"/>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp">
 
-        <TextView
-            android:id="@+id/dhuhr_time"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/asr_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Asr"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:gravity="center"/>
+
+            <TextView
+                android:id="@+id/asr_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="3:50"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="3dp"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- Maghrib Column -->
+        <LinearLayout
+            android:id="@+id/maghrib_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="12:45"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:layout_marginTop="3dp"
-            android:gravity="center"/>
-    </LinearLayout>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp">
 
-    <!-- Asr Column -->
-    <LinearLayout
-        android:id="@+id/asr_container"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:layout_marginLeft="2dp"
-        android:layout_marginRight="2dp">
+            <TextView
+                android:id="@+id/maghrib_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Maghrib"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:gravity="center"/>
 
-        <TextView
-            android:id="@+id/asr_label"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/maghrib_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="6:20"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="3dp"
+                android:gravity="center"/>
+        </LinearLayout>
+
+        <!-- Isha Column -->
+        <LinearLayout
+            android:id="@+id/isha_container"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="Asr"
-            android:textColor="#99FFFFFF"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.05"
-            android:gravity="center"/>
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginLeft="2dp"
+            android:layout_marginRight="2dp">
 
-        <TextView
-            android:id="@+id/asr_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="3:50"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:layout_marginTop="3dp"
-            android:gravity="center"/>
-    </LinearLayout>
+            <TextView
+                android:id="@+id/isha_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Isha"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:gravity="center"/>
 
-    <!-- Maghrib Column -->
-    <LinearLayout
-        android:id="@+id/maghrib_container"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:layout_marginLeft="2dp"
-        android:layout_marginRight="2dp">
+            <TextView
+                android:id="@+id/isha_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="7:45"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="3dp"
+                android:gravity="center"/>
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/maghrib_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Maghrib"
-            android:textColor="#99FFFFFF"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.05"
-            android:gravity="center"/>
-
-        <TextView
-            android:id="@+id/maghrib_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="6:20"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:layout_marginTop="3dp"
-            android:gravity="center"/>
-    </LinearLayout>
-
-    <!-- Isha Column -->
-    <LinearLayout
-        android:id="@+id/isha_container"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:layout_marginLeft="2dp"
-        android:layout_marginRight="2dp">
-
-        <TextView
-            android:id="@+id/isha_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Isha"
-            android:textColor="#99FFFFFF"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:letterSpacing="0.05"
-            android:gravity="center"/>
-
-        <TextView
-            android:id="@+id/isha_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="7:45"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:layout_marginTop="3dp"
-            android:gravity="center"/>
     </LinearLayout>
 
 </LinearLayout>

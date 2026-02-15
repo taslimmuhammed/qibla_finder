@@ -113,6 +113,7 @@ class PrayerTimesNotificationService : Service() {
             updateNotificationLayout(notificationLayout, location, madhab, calculationMethod)
         } else {
             // Show placeholder
+            notificationLayout.setTextViewText(R.id.notification_title, "Prayer Times")
             notificationLayout.setTextViewText(R.id.fajr_time, "—")
             notificationLayout.setTextViewText(R.id.dhuhr_time, "—")
             notificationLayout.setTextViewText(R.id.asr_time, "—")
@@ -127,7 +128,7 @@ class PrayerTimesNotificationService : Service() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pendingIntent)
             .setShowWhen(false)
@@ -141,15 +142,44 @@ class PrayerTimesNotificationService : Service() {
         calculationMethod: CalculationMethod
     ) {
         val coordinates = Coordinates(location.latitude, location.longitude)
-        val date = DateComponents.from(Date())
+        val now = Date()
         val params = calculationMethod.parameters
         params.madhab = madhab
         
-        val prayerTimes = PrayerTimes(coordinates, date, params)
-        val timeFormat = SimpleDateFormat("h:mm", Locale.getDefault())
-        val nextPrayer = prayerTimes.nextPrayer()
+        // Calculate today's prayer times first to check if we're past Isha
+        val todayDate = DateComponents.from(now)
+        val todayPrayerTimes = PrayerTimes(coordinates, todayDate, params)
+        
+        // Determine if we should show tomorrow's prayers
+        // After Isha (nextPrayer is NONE or it's past Isha time), switch to tomorrow
+        val nextPrayerToday = todayPrayerTimes.nextPrayer()
+        val showTomorrow = nextPrayerToday == Prayer.NONE || now.after(todayPrayerTimes.isha)
+        
+        val prayerTimes: PrayerTimes
+        val displayCalendar = Calendar.getInstance()
+        val highlightPrayer: Prayer
+        
+        if (showTomorrow) {
+            // Show tomorrow's prayer times
+            displayCalendar.add(Calendar.DAY_OF_MONTH, 1)
+            val tomorrowDate = DateComponents.from(displayCalendar.time)
+            prayerTimes = PrayerTimes(coordinates, tomorrowDate, params)
+            highlightPrayer = Prayer.FAJR // Highlight Fajr as next prayer for tomorrow
+        } else {
+            prayerTimes = todayPrayerTimes
+            displayCalendar.time = now
+            // Determine highlight: if next is SUNRISE, highlight Dhuhr instead
+            highlightPrayer = if (nextPrayerToday == Prayer.SUNRISE) Prayer.DHUHR else nextPrayerToday
+        }
+        
+        // Format date for title: "Today • Sat, Feb 15" or "Tomorrow • Sun, Feb 16"
+        val dayFormat = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
+        val dateStr = dayFormat.format(displayCalendar.time)
+        val prefix = if (showTomorrow) "Tomorrow" else "Today"
+        layout.setTextViewText(R.id.notification_title, "$prefix • $dateStr")
         
         // Set prayer times
+        val timeFormat = SimpleDateFormat("h:mm", Locale.getDefault())
         layout.setTextViewText(R.id.fajr_time, timeFormat.format(prayerTimes.fajr))
         layout.setTextViewText(R.id.dhuhr_time, timeFormat.format(prayerTimes.dhuhr))
         layout.setTextViewText(R.id.asr_time, timeFormat.format(prayerTimes.asr))
@@ -170,11 +200,9 @@ class PrayerTimesNotificationService : Service() {
         val defaultTimeColor = android.graphics.Color.parseColor("#FFFFFFFF")
         val highlightGold = android.graphics.Color.parseColor("#FFD4AF37")
         
-        // Reset all containers and apply highlight to next prayer
+        // Reset all containers and apply highlight to the next prayer
         for ((prayer, ids) in prayerViews) {
-            val isNext = nextPrayer == prayer
-            // If next prayer is SUNRISE, highlight Dhuhr instead
-            val isHighlighted = isNext || (nextPrayer == Prayer.SUNRISE && prayer == Prayer.DHUHR)
+            val isHighlighted = prayer == highlightPrayer
             
             if (isHighlighted) {
                 layout.setInt(ids.container, "setBackgroundResource", R.drawable.notification_highlight_bg)
