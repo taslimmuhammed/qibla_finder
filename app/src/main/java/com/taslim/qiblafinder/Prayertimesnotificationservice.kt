@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.batoulapps.adhan.*
 import com.batoulapps.adhan.data.DateComponents
@@ -33,6 +35,17 @@ class PrayerTimesNotificationService : Service() {
         }
     }
     
+    private val handler = Handler(Looper.getMainLooper())
+    private var lastHighlightedPrayer: Prayer? = null
+    
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            refreshNotification()
+            // Schedule next check in 60 seconds
+            handler.postDelayed(this, 60_000L)
+        }
+    }
+    
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -41,7 +54,17 @@ class PrayerTimesNotificationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, createNotification())
         scheduleDailyUpdate()
+        
+        // Start periodic refresh to keep the highlight current
+        handler.removeCallbacks(refreshRunnable)
+        handler.post(refreshRunnable)
+        
         return START_STICKY
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(refreshRunnable)
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
@@ -65,6 +88,67 @@ class PrayerTimesNotificationService : Service() {
         }
     }
     
+    /**
+     * Refreshes the notification only if the highlighted prayer has changed,
+     * to avoid unnecessary notification updates.
+     */
+    private fun refreshNotification() {
+        val currentHighlight = getCurrentHighlightPrayer()
+        if (currentHighlight != lastHighlightedPrayer) {
+            lastHighlightedPrayer = currentHighlight
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.notify(NOTIFICATION_ID, createNotification())
+        }
+    }
+    
+    /**
+     * Determines which prayer should currently be highlighted.
+     */
+    private fun getCurrentHighlightPrayer(): Prayer? {
+        val locationPrefs = getSharedPreferences("location_data", Context.MODE_PRIVATE)
+        val latitude = locationPrefs.getFloat("latitude", 0f).toDouble()
+        val longitude = locationPrefs.getFloat("longitude", 0f).toDouble()
+        
+        if (latitude == 0.0 && longitude == 0.0) return null
+        
+        val sharedPreferences = getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+        val madhabName = sharedPreferences.getString("madhab_preference", Madhab.SHAFI.name) ?: Madhab.SHAFI.name
+        val madhab = Madhab.valueOf(madhabName)
+        
+        val methodName = sharedPreferences.getString("method_preference", "MUSLIM_WORLD_LEAGUE") ?: "MUSLIM_WORLD_LEAGUE"
+        val calculationMethod = resolveCalculationMethod(methodName)
+        
+        val coordinates = Coordinates(latitude, longitude)
+        val now = Date()
+        val params = calculationMethod.parameters
+        params.madhab = madhab
+        
+        val todayDate = DateComponents.from(now)
+        val todayPrayerTimes = PrayerTimes(coordinates, todayDate, params)
+        val nextPrayerToday = todayPrayerTimes.nextPrayer()
+        val showTomorrow = nextPrayerToday == Prayer.NONE || now.after(todayPrayerTimes.isha)
+        
+        return if (showTomorrow) {
+            Prayer.FAJR
+        } else if (nextPrayerToday == Prayer.SUNRISE) {
+            Prayer.DHUHR
+        } else {
+            nextPrayerToday
+        }
+    }
+    
+    private fun resolveCalculationMethod(methodName: String): CalculationMethod {
+        return when (methodName) {
+            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
+            "EGYPTIAN" -> CalculationMethod.EGYPTIAN
+            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
+            "KARACHI" -> CalculationMethod.KARACHI
+            "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
+            else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+        }
+    }
+    
     private fun createNotification(): Notification {
         val sharedPreferences = getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
         val locationPrefs = getSharedPreferences("location_data", Context.MODE_PRIVATE)
@@ -74,15 +158,7 @@ class PrayerTimesNotificationService : Service() {
         val madhab = Madhab.valueOf(madhabName)
         
         val methodName = sharedPreferences.getString("method_preference", "MUSLIM_WORLD_LEAGUE") ?: "MUSLIM_WORLD_LEAGUE"
-        val calculationMethod = when (methodName) {
-            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
-            "EGYPTIAN" -> CalculationMethod.EGYPTIAN
-            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
-            "KARACHI" -> CalculationMethod.KARACHI
-            "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
-            else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-        }
+        val calculationMethod = resolveCalculationMethod(methodName)
         
         // Get saved location
         val latitude = locationPrefs.getFloat("latitude", 0f).toDouble()
@@ -113,7 +189,6 @@ class PrayerTimesNotificationService : Service() {
             updateNotificationLayout(notificationLayout, location, madhab, calculationMethod)
         } else {
             // Show placeholder
-            notificationLayout.setTextViewText(R.id.notification_title, "Prayer Times")
             notificationLayout.setTextViewText(R.id.fajr_time, "—")
             notificationLayout.setTextViewText(R.id.dhuhr_time, "—")
             notificationLayout.setTextViewText(R.id.asr_time, "—")
@@ -151,32 +226,26 @@ class PrayerTimesNotificationService : Service() {
         val todayPrayerTimes = PrayerTimes(coordinates, todayDate, params)
         
         // Determine if we should show tomorrow's prayers
-        // After Isha (nextPrayer is NONE or it's past Isha time), switch to tomorrow
         val nextPrayerToday = todayPrayerTimes.nextPrayer()
         val showTomorrow = nextPrayerToday == Prayer.NONE || now.after(todayPrayerTimes.isha)
         
         val prayerTimes: PrayerTimes
-        val displayCalendar = Calendar.getInstance()
         val highlightPrayer: Prayer
         
         if (showTomorrow) {
             // Show tomorrow's prayer times
-            displayCalendar.add(Calendar.DAY_OF_MONTH, 1)
-            val tomorrowDate = DateComponents.from(displayCalendar.time)
+            val tomorrowCal = Calendar.getInstance()
+            tomorrowCal.add(Calendar.DAY_OF_MONTH, 1)
+            val tomorrowDate = DateComponents.from(tomorrowCal.time)
             prayerTimes = PrayerTimes(coordinates, tomorrowDate, params)
-            highlightPrayer = Prayer.FAJR // Highlight Fajr as next prayer for tomorrow
+            highlightPrayer = Prayer.FAJR
         } else {
             prayerTimes = todayPrayerTimes
-            displayCalendar.time = now
-            // Determine highlight: if next is SUNRISE, highlight Dhuhr instead
             highlightPrayer = if (nextPrayerToday == Prayer.SUNRISE) Prayer.DHUHR else nextPrayerToday
         }
         
-        // Format date for title: "Today • Sat, Feb 15" or "Tomorrow • Sun, Feb 16"
-        val dayFormat = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
-        val dateStr = dayFormat.format(displayCalendar.time)
-        val prefix = if (showTomorrow) "Tomorrow" else "Today"
-        layout.setTextViewText(R.id.notification_title, "$prefix • $dateStr")
+        // Update tracked state
+        lastHighlightedPrayer = highlightPrayer
         
         // Set prayer times
         val timeFormat = SimpleDateFormat("h:mm", Locale.getDefault())
@@ -200,7 +269,7 @@ class PrayerTimesNotificationService : Service() {
         val defaultTimeColor = android.graphics.Color.parseColor("#FFFFFFFF")
         val highlightGold = android.graphics.Color.parseColor("#FFD4AF37")
         
-        // Reset all containers and apply highlight to the next prayer
+        // Apply highlight to the next prayer
         for ((prayer, ids) in prayerViews) {
             val isHighlighted = prayer == highlightPrayer
             
@@ -219,7 +288,7 @@ class PrayerTimesNotificationService : Service() {
     private fun scheduleDailyUpdate() {
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         
-        // Schedule update at midnight
+        // Schedule update at midnight to refresh prayer times for the new day
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 1)
@@ -249,6 +318,7 @@ class PrayerTimesNotificationService : Service() {
     }
     
     fun updateNotification() {
+        lastHighlightedPrayer = null // Force refresh
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.notify(NOTIFICATION_ID, createNotification())
     }
