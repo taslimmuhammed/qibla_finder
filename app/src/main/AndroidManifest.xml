@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
+    <!-- Exact alarm permissions for precise prayer time notifications -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    
     <!-- Sensor permissions -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />
@@ -66,6 +70,12 @@
         <!-- Daily update receiver -->
         <receiver
             android:name=".DailyUpdateReceiver"
+            android:enabled="true"
+            android:exported="false" />
+        
+        <!-- Prayer time alarm receiver -->
+        <receiver
+            android:name=".PrayerAlarmReceiver"
             android:enabled="true"
             android:exported="false" />
     </application>

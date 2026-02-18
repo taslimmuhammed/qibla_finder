@@ -14,6 +14,9 @@ class BootReceiver : BroadcastReceiver() {
             if (hasConfigured) {
                 // Restart the notification service
                 PrayerTimesNotificationService.startService(context)
+
+                // Reschedule all prayer alarms (they are lost on reboot)
+                PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)
             }
         }
     }

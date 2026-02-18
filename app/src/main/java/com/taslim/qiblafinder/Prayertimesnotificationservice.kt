@@ -53,7 +53,9 @@ class PrayerTimesNotificationService : Service() {
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, createNotification())
-        scheduleDailyUpdate()
+        
+        // Schedule exact alarms for each prayer time (replaces old inexact daily alarm)
+        PrayerAlarmScheduler.scheduleAllPrayerAlarms(this)
         
         // Start periodic refresh to keep the highlight current
         handler.removeCallbacks(refreshRunnable)
@@ -283,38 +285,6 @@ class PrayerTimesNotificationService : Service() {
                 layout.setTextColor(ids.time, defaultTimeColor)
             }
         }
-    }
-    
-    private fun scheduleDailyUpdate() {
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        
-        // Schedule update at midnight to refresh prayer times for the new day
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 1)
-            set(Calendar.SECOND, 0)
-            
-            // If it's past midnight, schedule for next day
-            if (before(Calendar.getInstance())) {
-                add(Calendar.DAY_OF_MONTH, 1)
-            }
-        }
-        
-        val intent = Intent(this, DailyUpdateReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        // Use setRepeating for daily updates
-        alarmManager.setRepeating(
-            AlarmManager.RTC_WAKEUP,
-            calendar.timeInMillis,
-            AlarmManager.INTERVAL_DAY,
-            pendingIntent
-        )
     }
     
     fun updateNotification() {
