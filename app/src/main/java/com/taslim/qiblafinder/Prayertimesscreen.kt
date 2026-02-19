@@ -139,8 +139,23 @@ fun PrayerTimesScreen(
         }
     }
     
-    val prayerTimes = remember(location, selectedMadhab, selectedCalculationMethod) {
-        location?.let { calculatePrayerTimes(it, selectedMadhab, selectedCalculationMethod) }
+    // Use live location or fall back to saved location from SharedPreferences
+    val effectiveLocation = remember(location) {
+        location ?: run {
+            val locationPrefs = context.getSharedPreferences("location_data", android.content.Context.MODE_PRIVATE)
+            val lat = locationPrefs.getFloat("latitude", 0f).toDouble()
+            val lng = locationPrefs.getFloat("longitude", 0f).toDouble()
+            if (lat != 0.0 || lng != 0.0) {
+                android.location.Location("saved").apply {
+                    latitude = lat
+                    longitude = lng
+                }
+            } else null
+        }
+    }
+    
+    val prayerTimes = remember(effectiveLocation, selectedMadhab, selectedCalculationMethod) {
+        effectiveLocation?.let { calculatePrayerTimes(it, selectedMadhab, selectedCalculationMethod) }
     }
     
     val currentPrayer = remember(prayerTimes) {
@@ -367,16 +382,14 @@ fun CurrentPrayerCard(
         label = "glow"
     )
     
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1C2541).copy(alpha = 0.9f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        // Current Prayer Card
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1C2541).copy(alpha = 0.9f)
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Column {
+            // Current Prayer section
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -433,19 +446,21 @@ fun CurrentPrayerCard(
                     )
                 }
             }
-        }
-        
-        // Next Prayer Card (separate)
-        if (nextPrayer != null) {
-            val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
-            val timeUntil = calculateTimeUntil(nextPrayerTime)
             
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1C2541).copy(alpha = 0.7f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            // Next Prayer section (merged into same card)
+            if (nextPrayer != null) {
+                val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
+                val timeUntil = calculateTimeUntil(nextPrayerTime)
+                
+                // Subtle divider
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .padding(horizontal = 20.dp)
+                        .background(Color(0xFFD4AF37).copy(alpha = 0.2f))
+                )
+                
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

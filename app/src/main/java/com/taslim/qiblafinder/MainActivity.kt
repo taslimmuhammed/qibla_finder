@@ -124,6 +124,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         
+        // Load saved location from SharedPreferences so prayer times work without live GPS
+        loadSavedLocation()
+        
+        // Try to get fresh location (will request permission if needed)
         checkLocationPermission()
         
         // Add lifecycle observer to detect when coming back from settings
@@ -152,18 +156,21 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // Show location requirement screen if no location
-                    if (!isLocationPermissionGranted) {
-                        LocationPermissionScreen(
-                            onRequestPermission = { checkLocationPermission() }
-                        )
-                    } else if (!isLocationEnabled) {
-                        LocationRequiredScreen(
-                            onOpenSettings = { openLocationSettings() }
-                        )
-                    } else if (userLocation == null) {
-                        // Permission granted and GPS on, but waiting for location fix
-                        LocationLoadingScreen()
+                    // If no location data is available at all (fresh install, never saved),
+                    // block the user with location screens until they grant it once
+                    if (userLocation == null) {
+                        if (!isLocationPermissionGranted) {
+                            LocationPermissionScreen(
+                                onRequestPermission = { checkLocationPermission() }
+                            )
+                        } else if (!isLocationEnabled) {
+                            LocationRequiredScreen(
+                                onOpenSettings = { openLocationSettings() }
+                            )
+                        } else {
+                            // Permission granted and GPS on, but waiting for location fix
+                            LocationLoadingScreen()
+                        }
                     } else {
                         QiblaFinderApp(
                             navController = navController,
@@ -174,7 +181,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             showCalibration = showCalibrationOverlay,
                             isAligned = isAligned,
                             onDismissCalibration = { showCalibrationOverlay = false },
-                            onRequestLocation = { checkLocationPermission() }
+                            onRequestLocation = { checkLocationPermission() },
+                            isLocationPermissionGranted = isLocationPermissionGranted,
+                            isLocationEnabled = isLocationEnabled,
+                            onOpenLocationSettings = { openLocationSettings() }
                         )
                     }
                 }
@@ -220,6 +230,38 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
     
+    private fun loadSavedLocation() {
+        val locationPrefs = getSharedPreferences("location_data", Context.MODE_PRIVATE)
+        val latitude = locationPrefs.getFloat("latitude", 0f).toDouble()
+        val longitude = locationPrefs.getFloat("longitude", 0f).toDouble()
+        
+        if (latitude != 0.0 || longitude != 0.0) {
+            val savedLocation = Location("saved").apply {
+                this.latitude = latitude
+                this.longitude = longitude
+            }
+            userLocation = savedLocation
+            calculateQiblaDirection(latitude, longitude)
+            
+            // Calculate magnetic declination from saved location
+            val geoField = android.hardware.GeomagneticField(
+                latitude.toFloat(),
+                longitude.toFloat(),
+                0f,
+                System.currentTimeMillis()
+            )
+            magneticDeclination = geoField.declination
+        }
+    }
+    
+    private fun saveLocationToPrefs(location: Location) {
+        getSharedPreferences("location_data", Context.MODE_PRIVATE).edit().apply {
+            putFloat("latitude", location.latitude.toFloat())
+            putFloat("longitude", location.longitude.toFloat())
+            apply()
+        }
+    }
+    
     private fun getUserLocation() {
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -237,38 +279,22 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             cancellationTokenSource.token
         ).addOnSuccessListener { location: Location? ->
             location?.let {
-                // Only use location if accuracy is good enough
-                if (it.hasAccuracy() && it.accuracy <= 50f) { // Within 50 meters
-                    userLocation = it
-                    locationAccuracy = it.accuracy
-                    
-                    // Calculate magnetic declination for this location
-                    val geoField = android.hardware.GeomagneticField(
-                        it.latitude.toFloat(),
-                        it.longitude.toFloat(),
-                        it.altitude.toFloat(),
-                        System.currentTimeMillis()
-                    )
-                    magneticDeclination = geoField.declination
-                    
-                    calculateQiblaDirection(it.latitude, it.longitude)
-                } else {
-                    // Accuracy not good enough, try again
-                    userLocation = it
-                    locationAccuracy = it.accuracy
-                    
-                    // Calculate magnetic declination anyway
-                    val geoField = android.hardware.GeomagneticField(
-                        it.latitude.toFloat(),
-                        it.longitude.toFloat(),
-                        it.altitude.toFloat(),
-                        System.currentTimeMillis()
-                    )
-                    magneticDeclination = geoField.declination
-                    
-                    calculateQiblaDirection(it.latitude, it.longitude)
-                    // You could also request location updates for better accuracy
-                }
+                userLocation = it
+                locationAccuracy = it.accuracy
+                
+                // Persist location for future use and notifications
+                saveLocationToPrefs(it)
+                
+                // Calculate magnetic declination for this location
+                val geoField = android.hardware.GeomagneticField(
+                    it.latitude.toFloat(),
+                    it.longitude.toFloat(),
+                    it.altitude.toFloat(),
+                    System.currentTimeMillis()
+                )
+                magneticDeclination = geoField.declination
+                
+                calculateQiblaDirection(it.latitude, it.longitude)
             }
         }
     }
@@ -418,7 +444,10 @@ fun QiblaCompassScreen(
     showCalibration: Boolean,
     isAligned: Boolean,
     onDismissCalibration: () -> Unit,
-    onRequestLocation: () -> Unit
+    onRequestLocation: () -> Unit,
+    isLocationPermissionGranted: Boolean = true,
+    isLocationEnabled: Boolean = true,
+    onOpenLocationSettings: () -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -464,6 +493,132 @@ fun QiblaCompassScreen(
             ),
         contentAlignment = Alignment.Center
     ) {
+        // Show enable-location prompt if location is not available
+        if (location == null || (!isLocationPermissionGranted || !isLocationEnabled)) {
+            // Stars background
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val random = java.util.Random(42)
+                repeat(80) {
+                    val x = random.nextFloat() * size.width
+                    val y = random.nextFloat() * size.height
+                    val alpha = random.nextFloat() * 0.5f + 0.3f
+                    drawCircle(
+                        color = Color.White.copy(alpha = alpha),
+                        radius = random.nextFloat() * 1.5f + 0.5f,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+            
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp)
+            ) {
+                // Compass icon
+                Icon(
+                    imageVector = Icons.Default.Explore,
+                    contentDescription = null,
+                    tint = Color(0xFFD4AF37).copy(alpha = 0.6f),
+                    modifier = Modifier.size(80.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    text = "QIBLA FINDER",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Light,
+                    letterSpacing = 6.sp,
+                    color = Color(0xFFD4AF37),
+                    fontFamily = FontFamily.Serif
+                )
+                
+                Text(
+                    text = "قِبْلَة",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xFFD4AF37).copy(alpha = 0.9f),
+                    fontFamily = FontFamily.Serif
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF1C2541).copy(alpha = 0.8f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (!isLocationPermissionGranted) Icons.Default.LocationOff else Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color(0xFFFFAA00),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = if (!isLocationPermissionGranted) "Location Permission Required" else "Location Services Required",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = if (!isLocationPermissionGranted) {
+                                "The Qibla compass needs your location to accurately point towards the Kaaba. Please grant location permission."
+                            } else {
+                                "Please enable location services (GPS) so the Qibla compass can determine your position and point towards the Kaaba."
+                            },
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Button(
+                            onClick = {
+                                if (!isLocationPermissionGranted) {
+                                    onRequestLocation()
+                                } else {
+                                    onOpenLocationSettings()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD4AF37)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (!isLocationPermissionGranted) "Grant Location Permission" else "Enable Location",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+            
+            return
+        }
         // Stars background
         Canvas(modifier = Modifier.fillMaxSize()) {
             val random = java.util.Random(42)
@@ -996,10 +1151,13 @@ fun QiblaFinderApp(
     showCalibration: Boolean,
     isAligned: Boolean,
     onDismissCalibration: () -> Unit,
-    onRequestLocation: () -> Unit
+    onRequestLocation: () -> Unit,
+    isLocationPermissionGranted: Boolean,
+    isLocationEnabled: Boolean,
+    onOpenLocationSettings: () -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: "compass"
+    val currentRoute = navBackStackEntry?.destination?.route ?: "prayerTimes"
     
     Scaffold(
         containerColor = Color.Transparent,
@@ -1020,9 +1178,16 @@ fun QiblaFinderApp(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = "compass",
+            startDestination = "prayerTimes",
             modifier = Modifier.padding(paddingValues)
         ) {
+            composable("prayerTimes") {
+                PrayerTimesScreen(
+                    location = location,
+                    onBack = { navController.navigate("compass") }
+                )
+            }
+            
             composable("compass") {
                 QiblaCompassScreen(
                     azimuth = azimuth,
@@ -1032,14 +1197,10 @@ fun QiblaFinderApp(
                     showCalibration = showCalibration,
                     isAligned = isAligned,
                     onDismissCalibration = onDismissCalibration,
-                    onRequestLocation = onRequestLocation
-                )
-            }
-            
-            composable("prayerTimes") {
-                PrayerTimesScreen(
-                    location = location,
-                    onBack = { navController.navigate("compass") }
+                    onRequestLocation = onRequestLocation,
+                    isLocationPermissionGranted = isLocationPermissionGranted,
+                    isLocationEnabled = isLocationEnabled,
+                    onOpenLocationSettings = onOpenLocationSettings
                 )
             }
         }
@@ -1088,20 +1249,20 @@ fun BottomNavigationBar(
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Compass Tab
-            NavigationItem(
-                icon = Icons.Default.Explore,
-                label = "Qibla",
-                isSelected = currentRoute == "compass",
-                onClick = { onNavigate("compass") }
-            )
-            
-            // Prayer Times Tab
+            // Prayer Times Tab (first)
             NavigationItem(
                 icon = Icons.Default.Schedule,
                 label = "Prayer Times",
                 isSelected = currentRoute == "prayerTimes",
                 onClick = { onNavigate("prayerTimes") }
+            )
+            
+            // Qibla Tab (second)
+            NavigationItem(
+                icon = Icons.Default.Explore,
+                label = "Qibla",
+                isSelected = currentRoute == "compass",
+                onClick = { onNavigate("compass") }
             )
         }
     }
