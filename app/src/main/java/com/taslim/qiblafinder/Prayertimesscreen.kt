@@ -382,6 +382,9 @@ fun CurrentPrayerCard(
         label = "glow"
     )
     
+    // When current prayer is Sunrise, collapse and only show next prayer
+    val isSunrise = currentPrayer == Prayer.SUNRISE
+    
     Card(
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFF1C2541).copy(alpha = 0.9f)
@@ -389,77 +392,81 @@ fun CurrentPrayerCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            // Current Prayer section
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                // Glow effect
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
+            if (!isSunrise) {
+                // Current Prayer section (hidden during Sunrise)
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF00D9FF).copy(alpha = glowAlpha.value * 0.3f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width / 2, size.height / 2),
-                            radius = size.width / 2
+                    // Glow effect
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                    ) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color(0xFF00D9FF).copy(alpha = glowAlpha.value * 0.3f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width / 2, size.height / 2),
+                                radius = size.width / 2
+                            )
                         )
-                    )
-                }
-                
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 28.dp, horizontal = 24.dp)
-                ) {
-                    Text(
-                        text = "CURRENT PRAYER",
-                        fontSize = 11.sp,
-                        letterSpacing = 3.sp,
-                        color = Color(0xFFD4AF37).copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Light
-                    )
+                    }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = currentPrayer?.name ?: "Unknown",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00D9FF),
-                        letterSpacing = 2.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = getPrayerArabicName(currentPrayer),
-                        fontSize = 24.sp,
-                        color = Color(0xFF00D9FF).copy(alpha = 0.8f),
-                        fontFamily = FontFamily.Serif
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp, horizontal = 24.dp)
+                    ) {
+                        Text(
+                            text = "CURRENT PRAYER",
+                            fontSize = 11.sp,
+                            letterSpacing = 3.sp,
+                            color = Color(0xFFD4AF37).copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Light
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = currentPrayer?.name ?: "Unknown",
+                            fontSize = 40.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF00D9FF),
+                            letterSpacing = 2.sp
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = getPrayerArabicName(currentPrayer),
+                            fontSize = 24.sp,
+                            color = Color(0xFF00D9FF).copy(alpha = 0.8f),
+                            fontFamily = FontFamily.Serif
+                        )
+                    }
                 }
             }
             
-            // Next Prayer section (merged into same card)
+            // Next Prayer section
             if (nextPrayer != null) {
                 val nextPrayerTime = getPrayerTime(prayerTimes, nextPrayer)
                 val timeUntil = calculateTimeUntil(nextPrayerTime)
                 
-                // Subtle divider
-                Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .padding(horizontal = 20.dp)
-                        .background(Color(0xFFD4AF37).copy(alpha = 0.2f))
-                )
+                if (!isSunrise) {
+                    // Subtle divider (only when current prayer section is shown)
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .padding(horizontal = 20.dp)
+                            .background(Color(0xFFD4AF37).copy(alpha = 0.2f))
+                    )
+                }
                 
                 Row(
                     modifier = Modifier

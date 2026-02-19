@@ -1307,25 +1307,35 @@ fun BottomNavigationBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 32.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Prayer Times Tab (first)
-            NavigationItem(
-                icon = Icons.Default.Schedule,
-                label = "Prayer Times",
-                isSelected = currentRoute == "prayerTimes",
-                onClick = { onNavigate("prayerTimes") }
-            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                NavigationItem(
+                    icon = Icons.Default.Schedule,
+                    label = "Prayer Times",
+                    isSelected = currentRoute == "prayerTimes",
+                    onClick = { onNavigate("prayerTimes") }
+                )
+            }
             
             // Qibla Tab (second)
-            NavigationItem(
-                icon = Icons.Default.Explore,
-                label = "Qibla",
-                isSelected = currentRoute == "compass",
-                onClick = { onNavigate("compass") }
-            )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                NavigationItem(
+                    icon = Icons.Default.Explore,
+                    label = "Qibla",
+                    isSelected = currentRoute == "compass",
+                    onClick = { onNavigate("compass") }
+                )
+            }
         }
     }
 }
