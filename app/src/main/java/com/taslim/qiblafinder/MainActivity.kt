@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -834,6 +835,67 @@ fun QiblaCompassScreen(
                             start = center,
                             end = Offset(qiblaX, qiblaY),
                             strokeWidth = 2.dp.toPx()
+                        )
+                        
+                        // Small Kaaba icon at the edge of the compass
+                        val kaabaSize = 14.dp.toPx()
+                        val kaabaX = center.x
+                        val kaabaY = center.y - (radius - 30.dp.toPx())
+                        val kaabaColor = if (isAligned) Color(0xFF00FF88) else Color(0xFFD4AF37)
+                        
+                        // Kaaba glow
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    kaabaColor.copy(alpha = glowAlpha.value * 0.5f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(kaabaX, kaabaY),
+                                radius = kaabaSize * 2f
+                            ),
+                            center = Offset(kaabaX, kaabaY),
+                            radius = kaabaSize * 2f
+                        )
+                        
+                        // Kaaba body (cube shape)
+                        val kaabaPath = Path().apply {
+                            // Main cube face
+                            moveTo(kaabaX - kaabaSize * 0.5f, kaabaY - kaabaSize * 0.3f)
+                            lineTo(kaabaX + kaabaSize * 0.5f, kaabaY - kaabaSize * 0.3f)
+                            lineTo(kaabaX + kaabaSize * 0.5f, kaabaY + kaabaSize * 0.5f)
+                            lineTo(kaabaX - kaabaSize * 0.5f, kaabaY + kaabaSize * 0.5f)
+                            close()
+                        }
+                        drawPath(
+                            path = kaabaPath,
+                            color = kaabaColor
+                        )
+                        
+                        // Kaaba top (slight roof line)
+                        val roofPath = Path().apply {
+                            moveTo(kaabaX - kaabaSize * 0.55f, kaabaY - kaabaSize * 0.3f)
+                            lineTo(kaabaX, kaabaY - kaabaSize * 0.5f)
+                            lineTo(kaabaX + kaabaSize * 0.55f, kaabaY - kaabaSize * 0.3f)
+                            close()
+                        }
+                        drawPath(
+                            path = roofPath,
+                            color = kaabaColor.copy(alpha = 0.8f)
+                        )
+                        
+                        // Kiswah band (horizontal gold stripe)
+                        drawLine(
+                            color = Color(0xFF0A1128),
+                            start = Offset(kaabaX - kaabaSize * 0.5f, kaabaY + kaabaSize * 0.05f),
+                            end = Offset(kaabaX + kaabaSize * 0.5f, kaabaY + kaabaSize * 0.05f),
+                            strokeWidth = 1.5.dp.toPx()
+                        )
+                        
+                        // Door detail (small rectangle)
+                        drawRect(
+                            color = Color(0xFF0A1128).copy(alpha = 0.7f),
+                            topLeft = Offset(kaabaX - kaabaSize * 0.1f, kaabaY + kaabaSize * 0.15f),
+                            size = Size(kaabaSize * 0.2f, kaabaSize * 0.35f)
                         )
                     }
                     
