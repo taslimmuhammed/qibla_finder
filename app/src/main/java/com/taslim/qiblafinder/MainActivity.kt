@@ -1224,18 +1224,20 @@ fun QiblaFinderApp(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            BottomNavigationBar(
-                currentRoute = currentRoute,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+            if (currentRoute != "prayerTimeSettings") {
+                BottomNavigationBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
-                }
-            )
+                )
+            }
         }
     ) { paddingValues ->
         NavHost(
@@ -1246,7 +1248,8 @@ fun QiblaFinderApp(
             composable("prayerTimes") {
                 PrayerTimesScreen(
                     location = location,
-                    onBack = { navController.navigate("compass") }
+                    onBack = { navController.navigate("compass") },
+                    onNavigateToSettings = { navController.navigate("prayerTimeSettings") }
                 )
             }
             
@@ -1263,6 +1266,13 @@ fun QiblaFinderApp(
                     isLocationPermissionGranted = isLocationPermissionGranted,
                     isLocationEnabled = isLocationEnabled,
                     onOpenLocationSettings = onOpenLocationSettings
+                )
+            }
+
+            composable("prayerTimeSettings") {
+                PrayerTimeSettingsScreen(
+                    location = location,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

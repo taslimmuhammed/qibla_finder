@@ -52,6 +52,10 @@ class PrayerTimesNotificationService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Reset tracked state so the notification is always re-posted with fresh data.
+        // This is critical when called from PrayerAlarmReceiver at prayer time —
+        // it ensures the notification reappears even if the user dismissed it.
+        lastHighlightedPrayer = null
         startForeground(NOTIFICATION_ID, createNotification())
         
         // Schedule exact alarms for each prayer time (replaces old inexact daily alarm)

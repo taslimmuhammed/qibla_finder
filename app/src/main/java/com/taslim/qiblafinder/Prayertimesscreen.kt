@@ -38,7 +38,8 @@ import kotlin.math.sin
 @Composable
 fun PrayerTimesScreen(
     location: Location?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as? android.app.Activity
@@ -79,7 +80,7 @@ fun PrayerTimesScreen(
         )
     }
     
-    var showSettings by remember { mutableStateOf(false) }
+
     
     // Notification permission launcher
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -231,7 +232,7 @@ fun PrayerTimesScreen(
                     )
                 }
                 
-                IconButton(onClick = { showSettings = !showSettings }) {
+                IconButton(onClick = onNavigateToSettings) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
@@ -274,23 +275,7 @@ fun PrayerTimesScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Settings Panel
-            if (showSettings) {
-                SettingsPanel(
-                    selectedMadhab = selectedMadhab,
-                    selectedCalculationMethod = selectedCalculationMethod,
-                    onMadhabChange = { 
-                        selectedMadhab = it
-                        savePreferences()
-                    },
-                    onCalculationMethodChange = { 
-                        selectedCalculationMethod = it
-                        savePreferences()
-                    }
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+
             
             // Current Prayer Indicator
             if (prayerTimes != null && currentPrayer != null) {
@@ -869,6 +854,211 @@ fun CalculationMethodOption(
                     modifier = Modifier.size(24.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun PrayerTimeSettingsScreen(
+    location: Location?,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+
+    val sharedPreferences = remember {
+        context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
+    }
+
+    // Load saved preferences
+    var selectedMadhab by remember {
+        mutableStateOf(
+            Madhab.valueOf(
+                sharedPreferences.getString("madhab_preference", Madhab.SHAFI.name) ?: Madhab.SHAFI.name
+            )
+        )
+    }
+
+    var selectedCalculationMethod by remember {
+        mutableStateOf(
+            try {
+                when (sharedPreferences.getString("method_preference", "MUSLIM_WORLD_LEAGUE")) {
+                    "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+                    "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
+                    "EGYPTIAN" -> CalculationMethod.EGYPTIAN
+                    "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
+                    "KARACHI" -> CalculationMethod.KARACHI
+                    "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
+                    else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+                }
+            } catch (e: Exception) {
+                CalculationMethod.MUSLIM_WORLD_LEAGUE
+            }
+        )
+    }
+
+    // Notification permission launcher
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        PrayerTimesNotificationService.startService(context)
+    }
+
+    fun saveAndGoBack() {
+        sharedPreferences.edit().apply {
+            putString("madhab_preference", selectedMadhab.name)
+            putString("method_preference", when (selectedCalculationMethod) {
+                CalculationMethod.MUSLIM_WORLD_LEAGUE -> "MUSLIM_WORLD_LEAGUE"
+                CalculationMethod.NORTH_AMERICA -> "NORTH_AMERICA"
+                CalculationMethod.EGYPTIAN -> "EGYPTIAN"
+                CalculationMethod.UMM_AL_QURA -> "UMM_AL_QURA"
+                CalculationMethod.KARACHI -> "KARACHI"
+                CalculationMethod.MOON_SIGHTING_COMMITTEE -> "MOON_SIGHTING_COMMITTEE"
+                else -> "MUSLIM_WORLD_LEAGUE"
+            })
+            apply()
+        }
+
+        // Save location data for notification
+        location?.let { loc ->
+            context.getSharedPreferences("location_data", Context.MODE_PRIVATE).edit().apply {
+                putFloat("latitude", loc.latitude.toFloat())
+                putFloat("longitude", loc.longitude.toFloat())
+                apply()
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    PrayerTimesNotificationService.startService(context)
+                } else {
+                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
+                PrayerTimesNotificationService.startService(context)
+            }
+        }
+
+        onBack()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0A1128),
+                        Color(0xFF1C2541),
+                        Color(0xFF2E3D5C)
+                    )
+                )
+            )
+    ) {
+        // Stars background
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val random = java.util.Random(42)
+            repeat(80) {
+                val x = random.nextFloat() * size.width
+                val y = random.nextFloat() * size.height
+                val alpha = random.nextFloat() * 0.5f + 0.3f
+                drawCircle(
+                    color = Color.White.copy(alpha = alpha),
+                    radius = random.nextFloat() * 1.5f + 0.5f,
+                    center = Offset(x, y)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+        ) {
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // Header with back button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFFD4AF37)
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "SETTINGS",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 5.sp,
+                        color = Color(0xFFD4AF37),
+                        fontFamily = FontFamily.Serif
+                    )
+
+                    Text(
+                        text = "الإعدادات",
+                        fontSize = 20.sp,
+                        color = Color(0xFFD4AF37).copy(alpha = 0.8f),
+                        fontFamily = FontFamily.Serif
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Settings content (reuses SettingsPanel)
+            SettingsPanel(
+                selectedMadhab = selectedMadhab,
+                selectedCalculationMethod = selectedCalculationMethod,
+                onMadhabChange = { selectedMadhab = it },
+                onCalculationMethodChange = { selectedCalculationMethod = it }
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Save Button
+            Button(
+                onClick = { saveAndGoBack() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD4AF37)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF0A1128),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "SAVE SETTINGS",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    color = Color(0xFF0A1128)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }
