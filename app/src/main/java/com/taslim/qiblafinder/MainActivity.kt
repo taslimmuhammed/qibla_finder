@@ -96,6 +96,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var showCalibrationOverlay by mutableStateOf(false)
     private var isAligned by mutableStateOf(false)
     private var lastAlignmentState by mutableStateOf(false)
+    private var isCompassScreenActive by mutableStateOf(false)
+    private var areCompassSensorsRegistered = false
+    private var isActivityInForeground = false
     private var resumeTrigger by mutableIntStateOf(0)
     
     private lateinit var vibrator: Vibrator
@@ -185,7 +188,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             onRequestLocation = { checkLocationPermission() },
                             isLocationPermissionGranted = isLocationPermissionGranted,
                             isLocationEnabled = isLocationEnabled,
-                            onOpenLocationSettings = { openLocationSettings() }
+                            onOpenLocationSettings = { openLocationSettings() },
+                            onCompassScreenVisibilityChanged = ::onCompassScreenVisibilityChanged
                         )
                     }
                 }
@@ -326,13 +330,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     
     override fun onResume() {
         super.onResume()
-        // Use SENSOR_DELAY_GAME for better accuracy and responsiveness
-        accelerometer?.also { accel ->
-            sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
-        }
-        magnetometer?.also { mag ->
-            sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_GAME)
-        }
+        isActivityInForeground = true
+        updateCompassSensorRegistration()
         
         // Re-check location when app resumes (user might have enabled it in settings)
         if (isLocationPermissionGranted) {
@@ -350,10 +349,47 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     
     override fun onPause() {
         super.onPause()
-        sensorManager.unregisterListener(this)
+        isActivityInForeground = false
+        updateCompassSensorRegistration()
+    }
+
+    private fun updateCompassSensorRegistration() {
+        val shouldRegisterSensors = isActivityInForeground && isCompassScreenActive
+
+        if (shouldRegisterSensors == areCompassSensorsRegistered) {
+            return
+        }
+
+        if (shouldRegisterSensors) {
+            accelerometer?.also { accel ->
+                sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
+            }
+            magnetometer?.also { mag ->
+                sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_GAME)
+            }
+        } else {
+            sensorManager.unregisterListener(this)
+            isAligned = false
+            lastAlignmentState = false
+        }
+
+        areCompassSensorsRegistered = shouldRegisterSensors
+    }
+
+    private fun onCompassScreenVisibilityChanged(isVisible: Boolean) {
+        if (isCompassScreenActive == isVisible) {
+            return
+        }
+
+        isCompassScreenActive = isVisible
+        updateCompassSensorRegistration()
     }
     
     override fun onSensorChanged(event: SensorEvent) {
+        if (!isCompassScreenActive) {
+            return
+        }
+
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> {
                 // Apply low-pass filter for smoothing
@@ -420,6 +456,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
     
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        if (!isCompassScreenActive) {
+            return
+        }
+
         sensor?.let {
             when (it.type) {
                 Sensor.TYPE_MAGNETIC_FIELD -> {
@@ -1216,10 +1256,15 @@ fun QiblaFinderApp(
     onRequestLocation: () -> Unit,
     isLocationPermissionGranted: Boolean,
     isLocationEnabled: Boolean,
-    onOpenLocationSettings: () -> Unit
+    onOpenLocationSettings: () -> Unit,
+    onCompassScreenVisibilityChanged: (Boolean) -> Unit
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "prayerTimes"
+
+    LaunchedEffect(currentRoute) {
+        onCompassScreenVisibilityChanged(currentRoute == "compass")
+    }
     
     Scaffold(
         containerColor = Color.Transparent,
