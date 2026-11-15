@@ -8,6 +8,9 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
+    <!-- Launch background; matches the Compose theme background -->
+    <color name="app_background">#FF0A0F0D</color>
+
     <!-- Qibla Finder Custom Colors -->
     <color name="gold">#FFD4AF37</color>
     <color name="navy_dark">#FF0A1128</color>

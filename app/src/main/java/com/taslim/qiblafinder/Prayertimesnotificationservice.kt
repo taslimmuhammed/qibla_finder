@@ -144,15 +144,7 @@ class PrayerTimesNotificationService : Service() {
     }
     
     private fun resolveCalculationMethod(methodName: String): CalculationMethod {
-        return when (methodName) {
-            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
-            "EGYPTIAN" -> CalculationMethod.EGYPTIAN
-            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
-            "KARACHI" -> CalculationMethod.KARACHI
-            "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
-            else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-        }
+        return CalculationOption.fromKey(methodName).method
     }
     
     private fun createNotification(): Notification {

@@ -10,10 +10,12 @@ class BootReceiver : BroadcastReceiver() {
             // Check if user has configured prayer times
             val sharedPreferences = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
             val hasConfigured = sharedPreferences.contains("madhab_preference")
-            
-            if (hasConfigured) {
+
+            if (hasConfigured && PrayerSettingsStore.needsPrayerAlarms(context)) {
                 // Restart the notification service
-                PrayerTimesNotificationService.startService(context)
+                if (PrayerSettingsStore.isNotificationsEnabled(context)) {
+                    PrayerTimesNotificationService.startService(context)
+                }
 
                 // Reschedule all prayer alarms (they are lost on reboot)
                 PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)

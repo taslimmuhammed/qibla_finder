@@ -10,6 +10,8 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val EXTRA_PRAYER_NAME = "prayer_name"
+        const val EXTRA_PRAYER_TIME = "prayer_time"
+        const val EXTRA_PRAYER_ENDS = "prayer_ends"
 
         // Request codes for each prayer alarm (must be unique)
         const val RC_FAJR = 100
@@ -36,10 +38,25 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
         // Don't process SUNRISE
         if (prayerName == "SUNRISE") return
 
+        // Both the times notification and every reminder are turned off
+        if (!PrayerSettingsStore.needsPrayerAlarms(context)) return
+
+        val prayer = runCatching { Prayer.valueOf(prayerName) }.getOrNull() ?: return
+        PrayerReminders.notifyIfEnabled(
+            context,
+            prayer,
+            scheduledAt = intent.getLongExtra(EXTRA_PRAYER_TIME, 0L),
+            endsAt = intent.getLongExtra(EXTRA_PRAYER_ENDS, 0L)
+        )
+
         // Ensure the persistent notification service is running and update its notification.
         // This will re-post the notification if the user dismissed it, and refresh the
         // highlighted prayer to reflect the current time.
-        PrayerTimesNotificationService.startService(context)
+        // Exact alarms may start a foreground service from the background; the inexact
+        // fallback may not, and that must not stop the next alarms being scheduled
+        if (PrayerSettingsStore.isNotificationsEnabled(context)) {
+            runCatching { PrayerTimesNotificationService.startService(context) }
+        }
 
         // Reschedule alarms for remaining prayers today + tomorrow's alarms
         PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)

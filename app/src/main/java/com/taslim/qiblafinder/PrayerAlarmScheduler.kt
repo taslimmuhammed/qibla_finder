@@ -65,7 +65,7 @@ object PrayerAlarmScheduler {
 
             if (prayerTime.after(now)) {
                 // This prayer is still upcoming — schedule it
-                scheduleExactAlarm(context, prayer, prayerTime)
+                scheduleExactAlarm(context, prayer, prayerTime, getPrayerEnd(todayPrayerTimes, prayer))
                 anyScheduledToday = true
                 Log.d(TAG, "Scheduled alarm for ${prayer.name} at $prayerTime")
             } else {
@@ -83,7 +83,7 @@ object PrayerAlarmScheduler {
 
             for (prayer in ALERT_PRAYERS) {
                 val prayerTime = getPrayerTime(tomorrowPrayerTimes, prayer)
-                scheduleExactAlarm(context, prayer, prayerTime)
+                scheduleExactAlarm(context, prayer, prayerTime, getPrayerEnd(tomorrowPrayerTimes, prayer))
                 Log.d(TAG, "Scheduled tomorrow's alarm for ${prayer.name} at $prayerTime")
             }
         }
@@ -92,13 +92,15 @@ object PrayerAlarmScheduler {
         scheduleMidnightAlarm(context)
     }
 
-    private fun scheduleExactAlarm(context: Context, prayer: Prayer, time: Date) {
+    private fun scheduleExactAlarm(context: Context, prayer: Prayer, time: Date, endsAt: Date?) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val requestCode = PrayerAlarmReceiver.getRequestCode(prayer)
         if (requestCode == -1) return
 
         val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
             putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_NAME, prayer.name)
+            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_TIME, time.time)
+            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_ENDS, endsAt?.time ?: 0L)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -230,15 +232,18 @@ object PrayerAlarmScheduler {
         }
     }
 
-    private fun resolveCalculationMethod(methodName: String): CalculationMethod {
-        return when (methodName) {
-            "MUSLIM_WORLD_LEAGUE" -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-            "NORTH_AMERICA" -> CalculationMethod.NORTH_AMERICA
-            "EGYPTIAN" -> CalculationMethod.EGYPTIAN
-            "UMM_AL_QURA" -> CalculationMethod.UMM_AL_QURA
-            "KARACHI" -> CalculationMethod.KARACHI
-            "MOON_SIGHTING_COMMITTEE" -> CalculationMethod.MOON_SIGHTING_COMMITTEE
-            else -> CalculationMethod.MUSLIM_WORLD_LEAGUE
+    /** When the next prayer begins, after which a reminder for this one is no longer useful. */
+    private fun getPrayerEnd(prayerTimes: PrayerTimes, prayer: Prayer): Date? {
+        return when (prayer) {
+            Prayer.FAJR -> prayerTimes.sunrise
+            Prayer.DHUHR -> prayerTimes.asr
+            Prayer.ASR -> prayerTimes.maghrib
+            Prayer.MAGHRIB -> prayerTimes.isha
+            else -> null
         }
+    }
+
+    private fun resolveCalculationMethod(methodName: String): CalculationMethod {
+        return CalculationOption.fromKey(methodName).method
     }
 }
