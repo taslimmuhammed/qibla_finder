@@ -196,6 +196,7 @@ class PrayerTimesNotificationService : Service() {
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(getColor(R.color.notification_accent))
             .setCustomContentView(notificationLayout)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
@@ -263,22 +264,23 @@ class PrayerTimesNotificationService : Service() {
             Prayer.ISHA to PrayerViewIds(R.id.isha_container, R.id.isha_label, R.id.isha_time)
         )
         
-        val defaultLabelColor = android.graphics.Color.parseColor("#99FFFFFF")
-        val defaultTimeColor = android.graphics.Color.parseColor("#FFFFFFFF")
-        val highlightGold = android.graphics.Color.parseColor("#FFD4AF37")
-        
+        val nameColor = getColor(R.color.notification_name)
+        val timeColor = getColor(R.color.notification_time)
+        val highlightNameColor = getColor(R.color.notification_highlight_name)
+        val highlightTimeColor = getColor(R.color.notification_highlight_time)
+
         // Apply highlight to the next prayer
         for ((prayer, ids) in prayerViews) {
             val isHighlighted = prayer == highlightPrayer
-            
+
             if (isHighlighted) {
                 layout.setInt(ids.container, "setBackgroundResource", R.drawable.notification_highlight_bg)
-                layout.setTextColor(ids.label, highlightGold)
-                layout.setTextColor(ids.time, highlightGold)
+                layout.setTextColor(ids.label, highlightNameColor)
+                layout.setTextColor(ids.time, highlightTimeColor)
             } else {
                 layout.setInt(ids.container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-                layout.setTextColor(ids.label, defaultLabelColor)
-                layout.setTextColor(ids.time, defaultTimeColor)
+                layout.setTextColor(ids.label, nameColor)
+                layout.setTextColor(ids.time, timeColor)
             }
         }
     }

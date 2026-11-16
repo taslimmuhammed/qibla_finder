@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's palette for the notification bar, which can't use the Compose theme -->
+    <color name="notification_panel">#FF0E1513</color>
+    <color name="notification_panel_border">#24D6B77E</color>
+    <color name="notification_name">#FFA39E92</color>
+    <color name="notification_time">#FFF2ECE0</color>
+    <color name="notification_highlight_name">#FFD6B77E</color>
+    <color name="notification_highlight_time">#FFEBD3A0</color>
+    <color name="notification_accent">#FFD6B77E</color>
+
+    <style name="NotificationPrayer">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">1dp</item>
+        <item name="android:layout_marginEnd">1dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">5dp</item>
+    </style>
+
+    <!-- Fixed heights let long names like Maghrib shrink to fit rather than wrap -->
+    <style name="NotificationPrayer.Name" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">16dp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">8sp</item>
+        <item name="android:autoSizeMaxTextSize">11sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/notification_name</item>
+    </style>
+
+    <style name="NotificationPrayer.Time" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:autoSizeTextType">uniform</item>
+        <item name="android:autoSizeMinTextSize">12sp</item>
+        <item name="android:autoSizeMaxTextSize">19sp</item>
+        <!-- Notifications inflate in a restricted context that won't load the app's bundled
+             fonts, so the times use the system serif to echo Cormorant in the app -->
+        <item name="android:fontFamily">serif</item>
+        <item name="android:fontFeatureSettings">lnum</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/notification_time</item>
+    </style>
+</resources>

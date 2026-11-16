@@ -1,208 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Today's prayer times in the notification bar, styled like the app: a midnight panel,
+    Cormorant times and the next prayer picked out in gold. The panel keeps its own colours
+    so it reads the same on light and dark notification shades.
+    Highlight colours are set from PrayerTimesNotificationService.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="#FF000000"
-    android:paddingLeft="4dp"
-    android:paddingRight="4dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:background="@drawable/notification_panel"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:padding="4dp">
 
-    <!-- Hidden title (kept for code compatibility) -->
-    <TextView
-        android:id="@+id/notification_title"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"/>
-
-    <!-- Prayer times grid -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false">
+        android:id="@+id/fajr_container"
+        style="@style/NotificationPrayer">
 
-        <!-- Fajr Column -->
-        <LinearLayout
-            android:id="@+id/fajr_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:layout_marginLeft="2dp"
-            android:layout_marginRight="2dp">
+        <TextView
+            android:id="@+id/fajr_label"
+            style="@style/NotificationPrayer.Name"
+            android:text="Fajr" />
 
-            <TextView
-                android:id="@+id/fajr_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Fajr"
-                android:textColor="#99FFFFFF"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.05"
-                android:gravity="center"/>
+        <TextView
+            android:id="@+id/fajr_time"
+            style="@style/NotificationPrayer.Time"
+            android:text="5:04" />
+    </LinearLayout>
 
-            <TextView
-                android:id="@+id/fajr_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="5:30"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginTop="3dp"
-                android:gravity="center"/>
-        </LinearLayout>
+    <LinearLayout
+        android:id="@+id/dhuhr_container"
+        style="@style/NotificationPrayer">
 
-        <!-- Dhuhr Column -->
-        <LinearLayout
-            android:id="@+id/dhuhr_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:layout_marginLeft="2dp"
-            android:layout_marginRight="2dp">
+        <TextView
+            android:id="@+id/dhuhr_label"
+            style="@style/NotificationPrayer.Name"
+            android:text="Dhuhr" />
 
-            <TextView
-                android:id="@+id/dhuhr_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Dhuhr"
-                android:textColor="#99FFFFFF"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.05"
-                android:gravity="center"/>
+        <TextView
+            android:id="@+id/dhuhr_time"
+            style="@style/NotificationPrayer.Time"
+            android:text="12:05" />
+    </LinearLayout>
 
-            <TextView
-                android:id="@+id/dhuhr_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="12:45"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginTop="3dp"
-                android:gravity="center"/>
-        </LinearLayout>
+    <LinearLayout
+        android:id="@+id/asr_container"
+        style="@style/NotificationPrayer">
 
-        <!-- Asr Column -->
-        <LinearLayout
-            android:id="@+id/asr_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:layout_marginLeft="2dp"
-            android:layout_marginRight="2dp">
+        <TextView
+            android:id="@+id/asr_label"
+            style="@style/NotificationPrayer.Name"
+            android:text="Asr" />
 
-            <TextView
-                android:id="@+id/asr_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Asr"
-                android:textColor="#99FFFFFF"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.05"
-                android:gravity="center"/>
+        <TextView
+            android:id="@+id/asr_time"
+            style="@style/NotificationPrayer.Time"
+            android:text="3:22" />
+    </LinearLayout>
 
-            <TextView
-                android:id="@+id/asr_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="3:50"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginTop="3dp"
-                android:gravity="center"/>
-        </LinearLayout>
+    <LinearLayout
+        android:id="@+id/maghrib_container"
+        style="@style/NotificationPrayer">
 
-        <!-- Maghrib Column -->
-        <LinearLayout
-            android:id="@+id/maghrib_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:layout_marginLeft="2dp"
-            android:layout_marginRight="2dp">
+        <TextView
+            android:id="@+id/maghrib_label"
+            style="@style/NotificationPrayer.Name"
+            android:text="Maghrib" />
 
-            <TextView
-                android:id="@+id/maghrib_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Maghrib"
-                android:textColor="#99FFFFFF"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.05"
-                android:gravity="center"/>
+        <TextView
+            android:id="@+id/maghrib_time"
+            style="@style/NotificationPrayer.Time"
+            android:text="5:50" />
+    </LinearLayout>
 
-            <TextView
-                android:id="@+id/maghrib_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="6:20"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginTop="3dp"
-                android:gravity="center"/>
-        </LinearLayout>
+    <LinearLayout
+        android:id="@+id/isha_container"
+        style="@style/NotificationPrayer">
 
-        <!-- Isha Column -->
-        <LinearLayout
-            android:id="@+id/isha_container"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:layout_marginLeft="2dp"
-            android:layout_marginRight="2dp">
+        <TextView
+            android:id="@+id/isha_label"
+            style="@style/NotificationPrayer.Name"
+            android:text="Isha" />
 
-            <TextView
-                android:id="@+id/isha_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Isha"
-                android:textColor="#99FFFFFF"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.05"
-                android:gravity="center"/>
-
-            <TextView
-                android:id="@+id/isha_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="7:45"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginTop="3dp"
-                android:gravity="center"/>
-        </LinearLayout>
-
+        <TextView
+            android:id="@+id/isha_time"
+            style="@style/NotificationPrayer.Time"
+            android:text="7:04" />
     </LinearLayout>
 
 </LinearLayout>

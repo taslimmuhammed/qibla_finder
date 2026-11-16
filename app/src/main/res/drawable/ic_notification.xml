@@ -1,49 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: the Kaaba, the simplest form of the app's mark. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-
-    <!-- Outer compass ring -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z"/>
-
-    <!-- North pointer (filled triangle pointing up) -->
+        android:pathData="M12,2.58 L19.7,7.04 L12,11.5 L4.3,7.04 Z"
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd" />
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M12,5.5l-2.5,5.5h5z"/>
-
-    <!-- South pointer (outline triangle pointing down) -->
+        android:pathData="M3.87,7.78 L11.57,12.25 L11.57,21.18 L3.87,16.71 Z M3.87,9.57 L11.57,14.03 L11.57,15.6 L3.87,11.13 Z"
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd" />
     <path
-        android:fillColor="@android:color/white"
-        android:fillAlpha="0.5"
-        android:pathData="M12,18.5l2.5,-5.5h-5z"/>
-
-    <!-- Center dot -->
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M12,11a1,1 0,1 0,0 2a1,1 0,1 0,0 -2z"/>
-
-    <!-- Cardinal direction marks -->
-    <!-- N mark -->
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M11.25,3.5h1.5v1h-1.5z"/>
-    <!-- S mark -->
-    <path
-        android:fillColor="@android:color/white"
-        android:fillAlpha="0.5"
-        android:pathData="M11.25,19.5h1.5v1h-1.5z"/>
-    <!-- E mark -->
-    <path
-        android:fillColor="@android:color/white"
-        android:fillAlpha="0.5"
-        android:pathData="M19.5,11.25h1v1.5h-1z"/>
-    <!-- W mark -->
-    <path
-        android:fillColor="@android:color/white"
-        android:fillAlpha="0.5"
-        android:pathData="M3.5,11.25h1v1.5h-1z"/>
-
+        android:pathData="M12.43,12.25 L20.13,7.78 L20.13,16.71 L12.43,21.18 Z M12.43,14.03 L20.13,9.57 L20.13,11.13 L12.43,15.6 Z"
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd" />
 </vector>

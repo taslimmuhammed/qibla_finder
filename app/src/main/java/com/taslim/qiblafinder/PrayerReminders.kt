@@ -63,7 +63,7 @@ object PrayerReminders {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(0xFFD6B77E.toInt())
+            .setColor(context.getColor(R.color.notification_accent))
             .setContentTitle("${prayer.displayName} · ${prayer.arabicName}")
             .setContentText(
                 if (city != null) "It's time for ${prayer.displayName} in $city." else "It's time for ${prayer.displayName}."
