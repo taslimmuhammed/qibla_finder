@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Status bar icon: the Kaaba, the simplest form of the app's mark. -->
+<!-- Status bar icon: the star compass in one colour. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="24dp"
@@ -7,15 +7,14 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
     <path
-        android:pathData="M12,2.58 L19.7,7.04 L12,11.5 L4.3,7.04 Z"
+        android:pathData="M12,0.6 L23.4,12 L12,23.4 L0.6,12 Z M12,2.72 L21.28,12 L12,21.28 L2.72,12 Z"
         android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd" />
     <path
-        android:pathData="M3.87,7.78 L11.57,12.25 L11.57,21.18 L3.87,16.71 Z M3.87,9.57 L11.57,14.03 L11.57,15.6 L3.87,11.13 Z"
+        android:pathData="M20.06,3.94 L20.06,20.06 L3.94,20.06 L3.94,3.94 Z M18.56,5.44 L18.56,18.56 L5.44,18.56 L5.44,5.44 Z"
         android:fillColor="#FFFFFFFF"
         android:fillType="evenOdd" />
     <path
-        android:pathData="M12.43,12.25 L20.13,7.78 L20.13,16.71 L12.43,21.18 Z M12.43,14.03 L20.13,9.57 L20.13,11.13 L12.43,15.6 Z"
-        android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd" />
+        android:pathData="M15.89,8.11 L13.2,13.2 L9.38,14.62 L10.8,10.8 Z"
+        android:fillColor="#FFFFFFFF" />
 </vector>

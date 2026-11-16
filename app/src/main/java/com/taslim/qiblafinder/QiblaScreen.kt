@@ -184,6 +184,21 @@ fun QiblaScreen(
                 }
 
                 AnimatedVisibility(
+                    visible = locationState.movedTimeZone,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    StatusBanner(
+                        icon = MihrabIcons.Pin,
+                        title = "Have you travelled?",
+                        message = "Your time zone has changed since you chose ${locationState.placeName ?: "your city"}.",
+                        actionLabel = "Update",
+                        onAction = { showPlaces = true },
+                        onDismiss = actions.keepManualLocation,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+                AnimatedVisibility(
                     visible = compass.needsCalibration,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()

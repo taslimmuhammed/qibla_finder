@@ -3,7 +3,7 @@
     Today's prayer times in the notification bar, styled like the app: a midnight panel,
     Cormorant times and the next prayer picked out in gold. The panel keeps its own colours
     so it reads the same on light and dark notification shades.
-    Highlight colours are set from PrayerTimesNotificationService.
+    Highlight colours are set from PrayerTimesNotification.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

@@ -8,6 +8,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.batoulapps.adhan.Coordinates
 import com.batoulapps.adhan.Madhab
 import com.batoulapps.adhan.Prayer
@@ -135,12 +138,21 @@ fun startOfDay(date: Date): Long = Calendar.getInstance().apply {
     set(Calendar.MILLISECOND, 0)
 }.timeInMillis
 
-/** Current time that ticks on the second, for countdowns. */
+/**
+ * Current time for countdowns, ticking on the minute since they only show minutes.
+ * It stops while the app is out of sight, so a screen left open doesn't keep the
+ * phone busy, and catches up as soon as the app is back.
+ */
 @Composable
-fun rememberNow(tickMillis: Long = 1_000L): State<Date> = produceState(Date()) {
-    while (true) {
-        delay(tickMillis - System.currentTimeMillis() % tickMillis)
-        value = Date()
+fun rememberNow(tickMillis: Long = 60_000L): State<Date> {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    return produceState(Date(), lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = Date()
+                delay(tickMillis - System.currentTimeMillis() % tickMillis)
+            }
+        }
     }
 }
 

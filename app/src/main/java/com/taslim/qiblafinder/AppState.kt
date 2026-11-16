@@ -23,6 +23,8 @@ class LocationState {
     var permissionDenied by mutableStateOf(false)
     /** True when the location is a city the user picked rather than a GPS fix. */
     var isManual by mutableStateOf(false)
+    /** True when the phone's time zone has changed since the user picked their city. */
+    var movedTimeZone by mutableStateOf(false)
 
     val status: LocationStatus
         get() = when {
@@ -91,7 +93,9 @@ class AppActions(
     val openAppSettings: () -> Unit,
     val onCompassVisibilityChanged: (Boolean) -> Unit,
     /** Uses a city the user picked instead of the device location. */
-    val setManualLocation: (CityResult) -> Unit
+    val setManualLocation: (CityResult) -> Unit,
+    /** Keeps the chosen city after the time zone changed, and stops asking about it. */
+    val keepManualLocation: () -> Unit
 ) {
     /** Resolves whatever is currently stopping us from getting a location. */
     fun resolveLocation(state: LocationState) {

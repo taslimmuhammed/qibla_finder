@@ -1,6 +1,5 @@
 package com.taslim.qiblafinder
 
-import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -49,16 +48,10 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
             endsAt = intent.getLongExtra(EXTRA_PRAYER_ENDS, 0L)
         )
 
-        // Ensure the persistent notification service is running and update its notification.
-        // This will re-post the notification if the user dismissed it, and refresh the
-        // highlighted prayer to reflect the current time.
-        // Exact alarms may start a foreground service from the background; the inexact
-        // fallback may not, and that must not stop the next alarms being scheduled
-        if (PrayerSettingsStore.isNotificationsEnabled(context)) {
-            runCatching { PrayerTimesNotificationService.startService(context) }
-        }
+        // Move the highlight on to the next prayer, re-posting the notification if it was dismissed
+        PrayerTimesNotification.update(context)
 
-        // Reschedule alarms for remaining prayers today + tomorrow's alarms
+        // Set this prayer's alarm for tomorrow, and refresh the others
         PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)
     }
 }

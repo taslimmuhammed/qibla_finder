@@ -9,12 +9,8 @@ class DailyUpdateReceiver : BroadcastReceiver() {
         // Both the times notification and every reminder are turned off
         if (!PrayerSettingsStore.needsPrayerAlarms(context)) return
 
-        // Restart the service to update the persistent notification for the new day
-        if (PrayerSettingsStore.isNotificationsEnabled(context)) {
-            runCatching { PrayerTimesNotificationService.startService(context) }
-        }
-
-        // Schedule exact alarms for today's prayer times
+        // Refresh the notification for the new day and set the day's alarms again
+        PrayerTimesNotification.update(context)
         PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)
     }
 }

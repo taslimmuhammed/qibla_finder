@@ -4,22 +4,25 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
+/**
+ * Restores the notification and alarms after events that clear or invalidate them: a reboot,
+ * an app update, or a change to the clock or time zone (the day's times move with it).
+ */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Check if user has configured prayer times
-            val sharedPreferences = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
-            val hasConfigured = sharedPreferences.contains("madhab_preference")
+        if (intent.action !in HANDLED_ACTIONS) return
+        if (!PrayerSettingsStore.isOnboardingComplete(context)) return
 
-            if (hasConfigured && PrayerSettingsStore.needsPrayerAlarms(context)) {
-                // Restart the notification service
-                if (PrayerSettingsStore.isNotificationsEnabled(context)) {
-                    PrayerTimesNotificationService.startService(context)
-                }
+        PrayerTimesNotification.update(context)
+        PrayerAlarmScheduler.sync(context)
+    }
 
-                // Reschedule all prayer alarms (they are lost on reboot)
-                PrayerAlarmScheduler.scheduleAllPrayerAlarms(context)
-            }
-        }
+    private companion object {
+        val HANDLED_ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED
+        )
     }
 }

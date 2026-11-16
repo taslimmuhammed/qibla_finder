@@ -29,8 +29,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         // After a denial the system only stops offering the dialog once it's permanently blocked
         locationState.permissionBlocked = !granted &&
             !ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)
-        if (granted) fetchLocation()
+        if (granted) fetchLocation(userRequested = true)
     }
 
     // Reacts when location is toggled from quick settings without leaving the app
@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             val wasEnabled = locationState.servicesEnabled
             locationState.servicesEnabled = isLocationEnabled()
             if (!wasEnabled && locationState.servicesEnabled && locationState.location == null) {
-                fetchLocation()
+                fetchLocation(userRequested = true)
             }
         }
     }
@@ -119,16 +119,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         locationState.permissionGranted = hasLocationPermission()
         locationState.servicesEnabled = isLocationEnabled()
 
-        // Refresh silently on launch, unless the user chose a city by hand.
-        // New users are asked for permission during onboarding.
-        if (locationState.permissionGranted && !locationState.isManual) fetchLocation()
-
         val actions = AppActions(
             requestLocation = ::requestLocation,
             openLocationSettings = ::openLocationSettings,
             openAppSettings = ::openAppSettings,
             onCompassVisibilityChanged = ::onCompassScreenVisibilityChanged,
-            setManualLocation = ::setManualLocation
+            setManualLocation = ::setManualLocation,
+            keepManualLocation = ::keepManualLocation
         )
 
         setContent {
@@ -145,12 +142,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     override fun onStart() {
         super.onStart()
-        // A city picked by hand never triggers a GPS fix, so make sure the notification and
-        // reminders are running whenever the app comes to the foreground
+        // Brings back a notification the user swiped away, and alarms cleared by a force stop
         if (settings.onboardingComplete) {
-            if (settings.notificationsEnabled) runCatching { PrayerTimesNotificationService.startService(this) }
-            if (settings.reminders.isNotEmpty()) PrayerAlarmScheduler.scheduleAllPrayerAlarms(this)
+            PrayerTimesNotification.update(this)
+            PrayerAlarmScheduler.sync(this)
         }
+        locationState.movedTimeZone = locationState.isManual && PrayerTimesNotification.hasChangedTimeZone(this)
+        refreshLocationIfStale()
         ContextCompat.registerReceiver(
             this,
             providersChangedReceiver,
@@ -179,7 +177,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (locationState.permissionGranted && locationState.servicesEnabled && !locationState.isManual &&
             (locationState.location == null || justGranted)
         ) {
-            fetchLocation()
+            fetchLocation(userRequested = true)
         }
     }
 
@@ -217,7 +215,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 )
             )
             !isLocationEnabled() -> openLocationSettings()
-            else -> fetchLocation()
+            else -> fetchLocation(userRequested = true)
         }
     }
 
@@ -231,8 +229,29 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         )
     }
 
+    /**
+     * Updates a live location when the app comes into view, if the last fix is old or the
+     * time zone has changed since. Location is never tracked in the background: the
+     * notification and reminders use the most recent fix.
+     */
+    private fun refreshLocationIfStale() {
+        if (!locationState.permissionGranted || locationState.isManual || locationState.location == null) return
+        val fixedAt = getSharedPreferences(LOCATION_PREFS, Context.MODE_PRIVATE).getLong(KEY_FIX_TIME, 0L)
+        if (System.currentTimeMillis() - fixedAt > LOCATION_MAX_AGE_MS ||
+            PrayerTimesNotification.hasChangedTimeZone(this)
+        ) {
+            fetchLocation(userRequested = false)
+        }
+    }
+
+    /**
+     * Gets a fresh fix. Routine refreshes use Wi-Fi and cell towers and accept a recent fix
+     * another app already paid for; city-level accuracy is plenty for the Qibla (a kilometre
+     * moves it by well under a degree) and for prayer times. Only an explicit request from
+     * the user turns on GPS.
+     */
     @SuppressLint("MissingPermission")
-    private fun fetchLocation() {
+    private fun fetchLocation(userRequested: Boolean) {
         if (!hasLocationPermission() || locationState.isLocating) return
         if (!isLocationEnabled()) {
             locationState.servicesEnabled = false
@@ -242,14 +261,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         locationState.isLocating = true
         locationState.lastAttemptFailed = false
 
-        // Approximate-only permission still gives a Qibla direction accurate to well under a degree
-        val priority = if (hasFineLocationPermission()) {
-            Priority.PRIORITY_HIGH_ACCURACY
-        } else {
-            Priority.PRIORITY_BALANCED_POWER_ACCURACY
-        }
+        val request = CurrentLocationRequest.Builder()
+            .setPriority(
+                if (userRequested && hasFineLocationPermission()) {
+                    Priority.PRIORITY_HIGH_ACCURACY
+                } else {
+                    Priority.PRIORITY_BALANCED_POWER_ACCURACY
+                }
+            )
+            .setMaxUpdateAgeMillis(if (userRequested) 60_000L else LOCATION_MAX_AGE_MS)
+            .setDurationMillis(30_000L)
+            .build()
         val requestId = ++locationRequestId
-        fusedLocationClient.getCurrentLocation(priority, CancellationTokenSource().token)
+        fusedLocationClient.getCurrentLocation(request, CancellationTokenSource().token)
             .addOnSuccessListener { location ->
                 if (requestId != locationRequestId) return@addOnSuccessListener
                 if (location != null) onLocationFound(location) else fetchLastKnownLocation(requestId)
@@ -310,18 +334,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         onPositionChanged()
     }
 
-    private fun onPositionChanged() {
-        if (settings.onboardingComplete && settings.reminders.isNotEmpty()) {
-            PrayerAlarmScheduler.scheduleAllPrayerAlarms(this)
-        }
+    private fun keepManualLocation() {
+        PrayerTimesNotification.rememberTimeZone(this)
+        locationState.movedTimeZone = false
+        PrayerTimesNotification.update(this)
+    }
 
-        // Keep the notification in sync with the new position. Foreground services can't be
-        // started from the background, and the fix may arrive after the user has left.
-        if (settings.onboardingComplete && settings.notificationsEnabled &&
-            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-        ) {
-            runCatching { PrayerTimesNotificationService.startService(this) }
-        }
+    /** Moves the notification and the day's alarms to the new position. */
+    private fun onPositionChanged() {
+        if (!settings.onboardingComplete) return
+        PrayerTimesNotification.update(this)
+        PrayerAlarmScheduler.sync(this)
     }
 
     private fun loadSavedLocation() {
@@ -350,7 +373,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             putFloat(KEY_LATITUDE, location.latitude.toFloat())
             putFloat(KEY_LONGITUDE, location.longitude.toFloat())
             putBoolean(KEY_MANUAL, isManual)
+            putLong(KEY_FIX_TIME, System.currentTimeMillis())
         }
+        PrayerTimesNotification.rememberTimeZone(this)
+        locationState.movedTimeZone = false
     }
 
     /** Turns coordinates into a friendly "City, Country" label, in the background. */
@@ -520,5 +546,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         const val KEY_PLACE_NAME = "place_name"
         const val KEY_COUNTRY_CODE = "country_code"
         const val KEY_MANUAL = "is_manual"
+        const val KEY_FIX_TIME = "fix_time"
+
+        // A fix younger than this is reused rather than measured again
+        const val LOCATION_MAX_AGE_MS = 10 * 60_000L
     }
 }

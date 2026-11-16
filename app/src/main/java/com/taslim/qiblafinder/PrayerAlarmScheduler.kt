@@ -6,218 +6,129 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.batoulapps.adhan.*
+import com.batoulapps.adhan.Coordinates
+import com.batoulapps.adhan.Madhab
+import com.batoulapps.adhan.Prayer
+import com.batoulapps.adhan.PrayerTimes
 import com.batoulapps.adhan.data.DateComponents
-import java.util.*
+import java.util.Calendar
+import java.util.Date
 
 /**
- * Utility object to schedule exact alarms for each prayer time.
- * Called from the service, boot receiver, and daily update receiver.
+ * Keeps one alarm per prayer, always set for its next occurrence, plus a daily refresh just
+ * after midnight. Each alarm reposts the times notification and fires any reminder, then
+ * schedules the rest again, so the chain never depends on a single alarm arriving.
+ *
+ * Only prayers with a reminder wake the phone. The others just refresh the notification,
+ * which can wait until the phone is next awake, so with reminders off the app never wakes it.
  */
 object PrayerAlarmScheduler {
 
     private const val TAG = "PrayerAlarmScheduler"
 
-    // Prayers that should trigger alert notifications (excludes SUNRISE)
-    private val ALERT_PRAYERS = listOf(
-        Prayer.FAJR,
-        Prayer.DHUHR,
-        Prayer.ASR,
-        Prayer.MAGHRIB,
-        Prayer.ISHA
-    )
+    private val ALERT_PRAYERS = listOf(Prayer.FAJR, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
 
-    /**
-     * Schedule exact alarms for all remaining prayer times today.
-     * Any prayer whose time has already passed is skipped.
-     * If all today's prayers have passed, schedules tomorrow's.
-     */
+    /** Schedules the alarms when the times notification or a reminder needs them, and clears them otherwise. */
+    fun sync(context: Context) {
+        if (PrayerSettingsStore.needsPrayerAlarms(context)) scheduleAllPrayerAlarms(context) else cancelAll(context)
+    }
+
     fun scheduleAllPrayerAlarms(context: Context) {
         val locationPrefs = context.getSharedPreferences("location_data", Context.MODE_PRIVATE)
         val latitude = locationPrefs.getFloat("latitude", 0f).toDouble()
         val longitude = locationPrefs.getFloat("longitude", 0f).toDouble()
-
         if (latitude == 0.0 && longitude == 0.0) {
             Log.w(TAG, "No location data available, cannot schedule prayer alarms")
             return
         }
 
         val sharedPreferences = context.getSharedPreferences("prayer_settings", Context.MODE_PRIVATE)
-        val madhabName = sharedPreferences.getString("madhab_preference", Madhab.SHAFI.name) ?: Madhab.SHAFI.name
-        val madhab = Madhab.valueOf(madhabName)
-
+        val madhab = runCatching {
+            Madhab.valueOf(sharedPreferences.getString("madhab_preference", null) ?: Madhab.SHAFI.name)
+        }.getOrDefault(Madhab.SHAFI)
         val methodName = sharedPreferences.getString("method_preference", "MUSLIM_WORLD_LEAGUE") ?: "MUSLIM_WORLD_LEAGUE"
-        val calculationMethod = resolveCalculationMethod(methodName)
+        val params = CalculationOption.fromKey(methodName).method.parameters
+        params.madhab = madhab
 
         val coordinates = Coordinates(latitude, longitude)
         val now = Date()
-        val params = calculationMethod.parameters
-        params.madhab = madhab
-
-        // Calculate today's prayer times
-        val todayDate = DateComponents.from(now)
-        val todayPrayerTimes = PrayerTimes(coordinates, todayDate, params)
-
-        var anyScheduledToday = false
+        val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 1) }.time
+        val today = PrayerTimes(coordinates, DateComponents.from(now), params)
+        val next = PrayerTimes(coordinates, DateComponents.from(tomorrow), params)
+        val reminders = PrayerSettingsStore.reminderPrayers(context)
 
         for (prayer in ALERT_PRAYERS) {
-            val prayerTime = getPrayerTime(todayPrayerTimes, prayer)
-
-            if (prayerTime.after(now)) {
-                // This prayer is still upcoming — schedule it
-                scheduleExactAlarm(context, prayer, prayerTime, getPrayerEnd(todayPrayerTimes, prayer))
-                anyScheduledToday = true
-                Log.d(TAG, "Scheduled alarm for ${prayer.name} at $prayerTime")
-            } else {
-                // Cancel any stale alarm for this prayer
-                cancelAlarm(context, prayer)
-            }
+            val times = if (getPrayerTime(today, prayer).after(now)) today else next
+            scheduleAlarm(
+                context,
+                prayer,
+                getPrayerTime(times, prayer),
+                getPrayerEnd(times, prayer),
+                wakeUp = prayer in reminders
+            )
         }
-
-        // If no prayers left today, schedule all of tomorrow's
-        if (!anyScheduledToday) {
-            val tomorrowCal = Calendar.getInstance()
-            tomorrowCal.add(Calendar.DAY_OF_MONTH, 1)
-            val tomorrowDate = DateComponents.from(tomorrowCal.time)
-            val tomorrowPrayerTimes = PrayerTimes(coordinates, tomorrowDate, params)
-
-            for (prayer in ALERT_PRAYERS) {
-                val prayerTime = getPrayerTime(tomorrowPrayerTimes, prayer)
-                scheduleExactAlarm(context, prayer, prayerTime, getPrayerEnd(tomorrowPrayerTimes, prayer))
-                Log.d(TAG, "Scheduled tomorrow's alarm for ${prayer.name} at $prayerTime")
-            }
-        }
-
-        // Schedule midnight daily reschedule alarm
         scheduleMidnightAlarm(context)
     }
 
-    private fun scheduleExactAlarm(context: Context, prayer: Prayer, time: Date, endsAt: Date?) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val requestCode = PrayerAlarmReceiver.getRequestCode(prayer)
-        if (requestCode == -1) return
+    fun cancelAll(context: Context) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        ALERT_PRAYERS.forEach { alarmManager.cancel(prayerIntent(context, it)) }
+        alarmManager.cancel(midnightIntent(context))
+    }
 
-        val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
-            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_NAME, prayer.name)
-            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_TIME, time.time)
-            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_ENDS, endsAt?.time ?: 0L)
+    private fun scheduleAlarm(context: Context, prayer: Prayer, time: Date, endsAt: Date?, wakeUp: Boolean) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val pendingIntent = prayerIntent(context, prayer, time, endsAt)
+
+        if (!wakeUp) {
+            alarmManager.set(AlarmManager.RTC, time.time, pendingIntent)
+            return
         }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        time.time,
-                        pendingIntent
-                    )
-                } else {
-                    // Fallback: use inexact alarm (better than nothing)
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        time.time,
-                        pendingIntent
-                    )
-                    Log.w(TAG, "Exact alarms not permitted, using inexact alarm for ${prayer.name}")
-                }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time.time, pendingIntent)
             } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    time.time,
-                    pendingIntent
-                )
+                Log.w(TAG, "Exact alarms not permitted, using inexact alarm for ${prayer.name}")
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time.time, pendingIntent)
             }
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException scheduling alarm for ${prayer.name}: ${e.message}")
-            // Fallback to inexact
-            alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                time.time,
-                pendingIntent
-            )
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time.time, pendingIntent)
         }
     }
 
-    private fun cancelAlarm(context: Context, prayer: Prayer) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val requestCode = PrayerAlarmReceiver.getRequestCode(prayer)
-        if (requestCode == -1) return
-
-        val intent = Intent(context, PrayerAlarmReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
+    private fun prayerIntent(context: Context, prayer: Prayer, time: Date? = null, endsAt: Date? = null): PendingIntent {
+        val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
+            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_NAME, prayer.name)
+            time?.let { putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_TIME, it.time) }
+            putExtra(PrayerAlarmReceiver.EXTRA_PRAYER_ENDS, endsAt?.time ?: 0L)
+        }
+        return PendingIntent.getBroadcast(
             context,
-            requestCode,
+            PrayerAlarmReceiver.getRequestCode(prayer),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.cancel(pendingIntent)
     }
 
-    /**
-     * Schedule a midnight alarm to recalculate and reschedule prayer alarms for the new day.
-     */
-    private fun scheduleMidnightAlarm(context: Context) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    private fun midnightIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        0,
+        Intent(context, DailyUpdateReceiver::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 
+    /** A safety net that refreshes everything once a day; it never needs to wake the phone. */
+    private fun scheduleMidnightAlarm(context: Context) {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 1)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-
-            // If it's already past midnight, schedule for next day
-            if (before(Calendar.getInstance())) {
-                add(Calendar.DAY_OF_MONTH, 1)
-            }
+            if (before(Calendar.getInstance())) add(Calendar.DAY_OF_MONTH, 1)
         }
-
-        val intent = Intent(context, DailyUpdateReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
-            } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException scheduling midnight alarm: ${e.message}")
-            alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-        }
-
-        Log.d(TAG, "Scheduled midnight alarm at ${calendar.time}")
+        context.getSystemService(AlarmManager::class.java)
+            .set(AlarmManager.RTC, calendar.timeInMillis, midnightIntent(context))
     }
 
     private fun getPrayerTime(prayerTimes: PrayerTimes, prayer: Prayer): Date {
@@ -241,9 +152,5 @@ object PrayerAlarmScheduler {
             Prayer.MAGHRIB -> prayerTimes.isha
             else -> null
         }
-    }
-
-    private fun resolveCalculationMethod(methodName: String): CalculationMethod {
-        return CalculationOption.fromKey(methodName).method
     }
 }

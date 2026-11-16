@@ -38,8 +38,8 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">24dp</item>
         <item name="android:autoSizeTextType">uniform</item>
-        <item name="android:autoSizeMinTextSize">12sp</item>
-        <item name="android:autoSizeMaxTextSize">19sp</item>
+        <item name="android:autoSizeMinTextSize">11sp</item>
+        <item name="android:autoSizeMaxTextSize">17sp</item>
         <!-- Notifications inflate in a restricted context that won't load the app's bundled
              fonts, so the times use the system serif to echo Cormorant in the app -->
         <item name="android:fontFamily">serif</item>

@@ -12,8 +12,6 @@
     
     <!-- Notification permission for prayer times -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
     <!-- Exact alarm permissions for precise prayer time notifications -->
@@ -46,24 +44,16 @@
             </intent-filter>
         </activity>
         
-        <!-- Prayer Times Notification Service -->
-        <service
-            android:name=".PrayerTimesNotificationService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Prayer times display" />
-        </service>
-        
-        <!-- Boot receiver to restart notification after device restart -->
+        <!-- Restores the notification and alarms after a restart, an app update or a clock change -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
         

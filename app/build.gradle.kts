@@ -44,6 +44,7 @@ dependencies {
     // Core Android (from version catalog)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation("androidx.fragment:fragment-ktx:1.8.5")
 

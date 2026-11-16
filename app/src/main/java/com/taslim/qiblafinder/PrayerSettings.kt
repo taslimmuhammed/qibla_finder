@@ -132,10 +132,7 @@ class PrayerSettingsStore(context: Context) {
     var reminders by mutableStateOf(readReminders(prefs))
         private set
 
-    // Users who configured an earlier version of the app already went through setup
-    var onboardingComplete by mutableStateOf(
-        prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false) || prefs.contains(KEY_MADHAB)
-    )
+    var onboardingComplete by mutableStateOf(readOnboardingComplete(prefs))
         private set
 
     /** Whether the first-run compass tip on the Qibla screen has been dismissed. */
@@ -157,11 +154,9 @@ class PrayerSettingsStore(context: Context) {
     fun updateNotificationsEnabled(enabled: Boolean) {
         notificationsEnabled = enabled
         prefs.edit { putBoolean(KEY_NOTIFICATIONS, enabled) }
-        if (enabled) {
-            PrayerTimesNotificationService.startService(appContext)
-        } else {
-            PrayerTimesNotificationService.stopService(appContext)
-        }
+        if (enabled) PrayerTimesNotification.update(appContext) else PrayerTimesNotification.cancel(appContext)
+        // With the notification off and no reminders left, the alarms are no longer needed
+        PrayerAlarmScheduler.sync(appContext)
     }
 
     fun setReminder(prayer: Prayer, enabled: Boolean) {
@@ -171,7 +166,8 @@ class PrayerSettingsStore(context: Context) {
     fun updateReminders(value: Set<Prayer>) {
         reminders = value.intersect(REMINDER_PRAYERS.toSet())
         prefs.edit { putStringSet(KEY_REMINDERS, reminders.mapTo(mutableSetOf()) { it.name }) }
-        if (reminders.isNotEmpty()) PrayerAlarmScheduler.scheduleAllPrayerAlarms(appContext)
+        // Rescheduling also switches each prayer's alarm between waking the phone and not
+        PrayerAlarmScheduler.sync(appContext)
     }
 
     fun markCompassTipSeen() {
@@ -196,15 +192,15 @@ class PrayerSettingsStore(context: Context) {
             putStringSet(KEY_REMINDERS, reminders.mapTo(mutableSetOf()) { it.name })
             putBoolean(KEY_ONBOARDING_COMPLETE, true)
         }
-        if (notifications) PrayerTimesNotificationService.startService(appContext)
-        if (reminders.isNotEmpty()) PrayerAlarmScheduler.scheduleAllPrayerAlarms(appContext)
+        PrayerTimesNotification.update(appContext)
+        PrayerAlarmScheduler.sync(appContext)
         onboardingComplete = true
     }
 
     private fun refreshNotification() {
-        // The service re-reads preferences on every start
-        if (notificationsEnabled) PrayerTimesNotificationService.startService(appContext)
-        if (reminders.isNotEmpty()) PrayerAlarmScheduler.scheduleAllPrayerAlarms(appContext)
+        // Both re-read preferences, so the new method or Asr time shows straight away
+        PrayerTimesNotification.update(appContext)
+        PrayerAlarmScheduler.sync(appContext)
     }
 
     private fun readMadhab(): Madhab =
@@ -228,6 +224,13 @@ class PrayerSettingsStore(context: Context) {
             prefs.getStringSet(KEY_REMINDERS, emptySet()).orEmpty()
                 .mapNotNull { name -> runCatching { Prayer.valueOf(name) }.getOrNull() }
                 .toSet()
+
+        // Users who configured an earlier version of the app already went through setup
+        private fun readOnboardingComplete(prefs: android.content.SharedPreferences): Boolean =
+            prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false) || prefs.contains(KEY_MADHAB)
+
+        fun isOnboardingComplete(context: Context): Boolean =
+            readOnboardingComplete(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
 
         fun reminderPrayers(context: Context): Set<Prayer> =
             readReminders(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
